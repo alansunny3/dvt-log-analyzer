@@ -1,174 +1,85 @@
-exports.handler = async (event, context) => {
-  // Enable CORS
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json',
-  };
+// Add this to your index.html inside the Analysis Method section:
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
-
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    };
-  }
-
-  try {
-    const { prompt } = JSON.parse(event.body || '{}');
-    
-    if (!prompt) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Missing prompt' }),
-      };
-    }
-
-    const apiKey = process.env.CLAUDE_API_KEY;
-    if (!apiKey) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'API key not configured' }),
-      };
-    }
-
-    // ULTRA-AGGRESSIVE PROMPT TRUNCATION FOR SPEED
-    // Extract only the most important parts
-    const lines = prompt.split('\n');
-    let truncatedContent = '';
-    
-    // Strategy: Take recent errors, warnings, and key events
-    const importantLines = [];
-    const errorLines = [];
-    const warningLines = [];
-    const consensusLines = [];
-    const relayLines = [];
-    
-    // Scan for important lines
-    for (let i = 0; i < Math.min(lines.length, 2000); i++) { // Limit scan to 2000 lines
-      const line = lines[i].toLowerCase();
-      
-      if (line.includes('error') && errorLines.length < 10) {
-        errorLines.push(lines[i]);
-      } else if (line.includes('warn') && warningLines.length < 5) {
-        warningLines.push(lines[i]);
-      } else if ((line.includes('consensus') || line.includes('qbft') || line.includes('leader')) && consensusLines.length < 5) {
-        consensusLines.push(lines[i]);
-      } else if ((line.includes('relay') || line.includes('mev')) && relayLines.length < 5) {
-        relayLines.push(lines[i]);
-      }
-    }
-    
-    // Build focused prompt with only key information
-    truncatedContent = `SUMMARY OF LOG ANALYSIS REQUEST:
-    
-Recent Errors (${errorLines.length}):
-${errorLines.join('\n')}
-
-Recent Warnings (${warningLines.length}):
-${warningLines.join('\n')}
-
-Consensus Events (${consensusLines.length}):
-${consensusLines.join('\n')}
-
-MEV/Relay Events (${relayLines.length}):
-${relayLines.join('\n')}
-
-Please provide a CONCISE analysis focusing on:
-1. Critical errors and their causes
-2. DVT consensus issues 
-3. MEV relay problems
-4. Quick recommendations
-
-Keep response under 1000 words.`;
-
-    console.log('Optimized prompt length:', truncatedContent.length);
-    
-    // Use 8-second timeout (2 seconds buffer before Netlify timeout)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
+// Replace the analysis method section with this enhanced version:
+React.createElement('div', { className: "bg-white/10 rounded-xl p-6 border border-white/20" },
+    React.createElement('h2', { className: "text-xl font-bold text-white mb-4" }, "Analysis Method"),
+    React.createElement('div', { className: "space-y-4" },
+        // Local Analysis Option
+        React.createElement('div', { 
+            className: `p-4 rounded-lg border-2 cursor-pointer transition-all ${!useAI ? 'border-blue-500 bg-blue-500/10' : 'border-white/20 hover:border-blue-400'}` ,
+            onClick: () => setUseAI(false)
         },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 1000, // Small response for speed
-          messages: [{
-            role: 'user',
-            content: truncatedContent
-          }]
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Claude API error:', response.status, errorText);
+            React.createElement('div', { className: "flex items-center gap-3 mb-2" },
+                React.createElement('input', {
+                    type: "radio",
+                    checked: !useAI,
+                    onChange: () => setUseAI(false)
+                }),
+                React.createElement('span', { className: "text-white font-medium" }, "Enhanced Local Analysis"),
+                React.createElement('span', { className: "bg-green-500 text-white px-2 py-1 rounded text-xs" }, "RECOMMENDED")
+            ),
+            React.createElement('div', { className: "text-sm text-gray-300 ml-6" },
+                React.createElement('div', { className: "mb-2" }, "🏥 Health scoring • 📊 Advanced patterns • ⚡ Instant results"),
+                React.createElement('div', { className: "text-green-300" }, "✅ Works with any file size • ✅ Comprehensive analysis • ✅ Always reliable")
+            )
+        ),
         
-        return {
-          statusCode: response.status,
-          headers,
-          body: JSON.stringify({ 
-            error: `Claude API error: ${response.status}. Try local analysis for detailed results.` 
-          }),
-        };
-      }
-
-      const data = await response.json();
-      console.log('Claude API success');
-
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          analysis: data.content[0].text + '\n\n---\n*AI Analysis (Optimized for speed) - For detailed analysis, use Local Analysis mode*',
-          usage: data.usage,
-          timestamp: new Date().toISOString()
-        }),
-      };
-
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      
-      if (fetchError.name === 'AbortError') {
-        return {
-          statusCode: 504,
-          headers,
-          body: JSON.stringify({ 
-            error: 'AI analysis timeout. Your logs are complex - try Local Analysis for instant results!' 
-          }),
-        };
-      }
-      
-      throw fetchError;
-    }
-
-  } catch (error) {
-    console.error('Function error:', error);
+        // AI Analysis Option
+        React.createElement('div', { 
+            className: `p-4 rounded-lg border-2 cursor-pointer transition-all ${useAI ? 'border-purple-500 bg-purple-500/10' : 'border-white/20 hover:border-purple-400'}`,
+            onClick: () => setUseAI(true)
+        },
+            React.createElement('div', { className: "flex items-center gap-3 mb-2" },
+                React.createElement('input', {
+                    type: "radio", 
+                    checked: useAI,
+                    onChange: () => setUseAI(true)
+                }),
+                React.createElement('span', { className: "text-white font-medium" }, "Claude AI Analysis"),
+                React.createElement('span', { className: "bg-purple-500 text-white px-2 py-1 rounded text-xs" }, "QUICK INSIGHTS")
+            ),
+            React.createElement('div', { className: "text-sm text-gray-300 ml-6" },
+                React.createElement('div', { className: "mb-2" }, "🤖 AI insights • 🚀 Ultra-fast (when it works) • 📝 Concise"),
+                React.createElement('div', { className: "text-yellow-300" }, "⚠️ May timeout with large files • ⚠️ Limited detail • ⚠️ Best for quick checks")
+            )
+        )
+    ),
     
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        error: `Analysis failed: ${error.message}. Local Analysis is recommended for large files.`,
-        timestamp: new Date().toISOString()
-      }),
-    };
-  }
-};
+    // File Size Warning
+    files.length > 0 && (() => {
+        const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+        const totalSizeMB = totalSize / (1024 * 1024);
+        
+        if (totalSizeMB > 1 && useAI) {
+            return React.createElement('div', { className: "mt-4 bg-yellow-900/30 rounded-lg p-4 border border-yellow-500/30" },
+                React.createElement('div', { className: "flex items-start gap-3" },
+                    React.createElement('div', { className: "text-yellow-400 text-xl" }, "⚠️"),
+                    React.createElement('div', {},
+                        React.createElement('h4', { className: "text-yellow-200 font-medium mb-1" }, 
+                            `Large Files Detected (${totalSizeMB.toFixed(1)}MB)`
+                        ),
+                        React.createElement('p', { className: "text-yellow-300 text-sm mb-2" },
+                            "AI analysis may timeout with files this large. Enhanced Local Analysis is recommended."
+                        ),
+                        React.createElement('button', {
+                            onClick: () => setUseAI(false),
+                            className: "bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+                        }, "Switch to Local Analysis")
+                    )
+                )
+            );
+        }
+        return null;
+    })(),
+    
+    // Pro Tips
+    React.createElement('div', { className: "mt-4 bg-blue-900/30 rounded-lg p-4 border border-blue-500/30" },
+        React.createElement('h4', { className: "text-blue-200 font-medium mb-2" }, "💡 Pro Tips:"),
+        React.createElement('ul', { className: "text-blue-300 text-sm space-y-1" },
+            React.createElement('li', {}, "• Enhanced Local Analysis rivals professional tools"),
+            React.createElement('li', {}, "• AI Analysis works best with files under 1MB"),
+            React.createElement('li', {}, "• For large files, Local Analysis is faster and more reliable"),
+            React.createElement('li', {}, "• Both methods provide actionable recommendations")
+        )
+    )
+)
