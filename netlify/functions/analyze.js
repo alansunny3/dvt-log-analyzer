@@ -1,5 +1,3 @@
-const https = require('https');
-
 exports.handler = async (event, context) => {
   // Enable CORS
   const headers = {
@@ -11,14 +9,9 @@ exports.handler = async (event, context) => {
 
   // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: '',
-    };
+    return { statusCode: 200, headers, body: '' };
   }
 
-  // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -28,135 +21,123 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Parse request body
-    const { prompt } = JSON.parse(event.body);
+    const { prompt } = JSON.parse(event.body || '{}');
     
     if (!prompt) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Missing prompt in request body' }),
+        body: JSON.stringify({ error: 'Missing prompt' }),
       };
     }
 
-    // Get Claude API key from environment variables
     const apiKey = process.env.CLAUDE_API_KEY;
     if (!apiKey) {
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: 'Claude API key not configured' }),
+        body: JSON.stringify({ error: 'API key not configured' }),
       };
     }
 
-    // Prepare Claude API request
-    const claudeData = JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 4000,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
-    });
+    // Truncate prompt if too long to speed up processing
+    const maxPromptLength = 8000;
+    const truncatedPrompt = prompt.length > maxPromptLength 
+      ? prompt.substring(0, maxPromptLength) + "\n\n[Content truncated for faster processing]"
+      : prompt;
 
-    const options = {
-      hostname: 'api.anthropic.com',
-      port: 443,
-      path: '/v1/messages',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Length': Buffer.byteLength(claudeData)
-      },
-      timeout: 30000 // 30 second timeout
-    };
+    console.log('Making Claude API request...');
+    
+    // Use shorter timeout and smaller response
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
 
-    // Make request to Claude API
-    const claudeResponse = await new Promise((resolve, reject) => {
-      const req = https.request(options, (res) => {
-        let data = '';
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 2000, // Reduced for faster response
+          messages: [{
+            role: 'user',
+            content: `Please provide a concise DVT log analysis (max 1500 words) for:\n\n${truncatedPrompt}`
+          }]
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Claude API error:', response.status, errorText);
         
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
+        // Handle specific error codes
+        if (response.status === 429) {
+          return {
+            statusCode: 429,
+            headers,
+            body: JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
+          };
+        }
         
-        res.on('end', () => {
-          try {
-            const parsed = JSON.parse(data);
-            resolve({ statusCode: res.statusCode, data: parsed });
-          } catch (e) {
-            reject(new Error('Invalid JSON response from Claude API'));
-          }
-        });
-      });
+        if (response.status === 401) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ error: 'Invalid API key. Please check your configuration.' }),
+          };
+        }
 
-      req.on('error', (error) => {
-        reject(error);
-      });
+        return {
+          statusCode: response.status,
+          headers,
+          body: JSON.stringify({ error: `Claude API error: ${response.status}` }),
+        };
+      }
 
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error('Request timeout'));
-      });
+      const data = await response.json();
+      console.log('Claude API success');
 
-      req.write(claudeData);
-      req.end();
-    });
-
-    // Handle Claude API response
-    if (claudeResponse.statusCode === 200) {
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           success: true,
-          analysis: claudeResponse.data.content[0].text,
-          usage: claudeResponse.data.usage,
+          analysis: data.content[0].text,
+          usage: data.usage,
           timestamp: new Date().toISOString()
         }),
       };
-    } else {
-      // Handle Claude API errors
-      let errorMessage = 'Claude API error';
-      
-      if (claudeResponse.statusCode === 401) {
-        errorMessage = 'Invalid API key';
-      } else if (claudeResponse.statusCode === 429) {
-        errorMessage = 'Rate limit exceeded. Please try again later.';
-      } else if (claudeResponse.statusCode >= 500) {
-        errorMessage = 'Claude API service unavailable';
-      } else if (claudeResponse.data && claudeResponse.data.error) {
-        errorMessage = claudeResponse.data.error.message || errorMessage;
-      }
 
-      return {
-        statusCode: claudeResponse.statusCode,
-        headers,
-        body: JSON.stringify({ error: errorMessage }),
-      };
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError.name === 'AbortError') {
+        console.error('Request timeout');
+        return {
+          statusCode: 504,
+          headers,
+          body: JSON.stringify({ error: 'Request timeout. Please try with a smaller file or use local analysis.' }),
+        };
+      }
+      
+      throw fetchError;
     }
 
   } catch (error) {
     console.error('Function error:', error);
     
-    let errorMessage = 'Internal server error';
-    let statusCode = 500;
-    
-    if (error.message.includes('timeout')) {
-      errorMessage = 'Request timeout. Please try again.';
-      statusCode = 504;
-    } else if (error.message.includes('JSON')) {
-      errorMessage = 'Invalid request format';
-      statusCode = 400;
-    }
-
     return {
-      statusCode,
+      statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: errorMessage,
+        error: `Analysis failed: ${error.message}. Try using local analysis for large files.`,
         timestamp: new Date().toISOString()
       }),
     };
