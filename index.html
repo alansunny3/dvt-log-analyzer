@@ -4,91 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DVT Log Analyzer</title>
-    <meta name="description" content="AI-powered DVT, MEV, and beacon node log analyzer">
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { 
             margin: 0; 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; 
-        }
-        .upload-area {
-            transition: all 0.3s ease;
-        }
-        .upload-area:hover {
-            transform: translateY(-2px);
+            font-family: system-ui, sans-serif; 
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #312e81 100%);
+            min-height: 100vh;
         }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <div style="padding: 2rem; text-align: center; color: white;">
+            <h1>DVT Log Analyzer</h1>
+            <p>Loading...</p>
+        </div>
+    </div>
     
     <script type="text/babel">
         const { useState, useRef } = React;
         
-        // SVG Icons
-        const Upload = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7,10 12,5 17,10"/>
-                <line x1="12" y1="5" x2="12" y2="15"/>
-            </svg>
-        );
-        
-        const FileText = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-                <path d="M14,2 L14,8 L20,8 M14,2 L20,8 L20,20 C20,21.1046 19.1046,22 18,22 L6,22 C4.89543,22 4,21.1046 4,20 L4,4 C4,2.89543 4.89543,2 6,2 L14,2 Z"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10,9 9,9 8,9"/>
-            </svg>
-        );
-        
-        const Activity = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-                <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
-            </svg>
-        );
-        
-        const Zap = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-                <polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2"/>
-            </svg>
-        );
-        
-        const CheckCircle = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22,4 12,14.01 9,11.01"/>
-            </svg>
-        );
-        
-        const Download = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7,10 12,15 17,10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-        );
-
-        const Trash2 = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-                <polyline points="3,6 5,6 21,6"/>
-                <path d="M19,6 L19,20 C19,21 18,22 17,22 L7,22 C6,22 5,21 5,20 L5,6"/>
-                <path d="M8,6 L8,4 C8,3 9,2 10,2 L14,2 C15,2 16,3 16,4 L16,6"/>
-            </svg>
-        );
-
-        const AlertCircle = ({ size = 24, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-        );
-
         const DVTLogAnalyzer = () => {
             const [files, setFiles] = useState([]);
             const [analysis, setAnalysis] = useState(null);
@@ -118,22 +57,6 @@
                 return 'other';
             };
 
-            const getFileTypeColor = (type) => {
-                const colors = {
-                    'charon': 'bg-purple-100 text-purple-800',
-                    'lighthouse': 'bg-blue-100 text-blue-800',
-                    'mev-boost': 'bg-green-100 text-green-800',
-                    'beacon': 'bg-orange-100 text-orange-800',
-                    'lodestar': 'bg-red-100 text-red-800',
-                    'other': 'bg-gray-100 text-gray-800'
-                };
-                return colors[type] || colors.other;
-            };
-
-            const removeFile = (id) => {
-                setFiles(files.filter(f => f.id !== id));
-            };
-
             const formatFileSize = (bytes) => {
                 if (bytes === 0) return '0 Bytes';
                 const k = 1024;
@@ -151,294 +74,66 @@
                 });
             };
 
-            // Enhanced Local Analysis Function
             const analyzeLogsLocally = async (filesWithContent) => {
-                let analysisReport = "# DVT Log Analysis Report\\n\\n";
+                let report = "# DVT Log Analysis Report\n\n";
                 
                 let errorCount = 0;
                 let warningCount = 0;
-                let criticalErrors = [];
-                let relayIssues = new Map();
-                let consensusIssues = [];
-                let leaderInfo = null;
-                let performanceMetrics = {
-                    blockProductionTime: [],
-                    consensusRounds: []
-                };
-                let timestamps = [];
+                let totalLines = 0;
                 
-                // Advanced pattern matching
-                const patterns = {
-                    leader: /(?:leader[_\\s]*(?:index|name)[:\\s]*([^\\s,}]+)|QBFT.*leader.*?([0-9]+)|consensus.*decided.*leader.*?([^\\s,}]+))/gi,
-                    relayError: /(relay|mev).*?(timeout|error|failed|403|502|500)/gi,
-                    consensusRound: /round[:\\s]*([0-9]+)/gi,
-                    blockProduction: /block.*(?:production|created|published).*?([0-9.]+)(?:s|ms)/gi,
-                    timestamp: /(\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2})/g
-                };
-                
-                // Analyze each file
                 for (const file of filesWithContent) {
-                    const lines = file.content.split('\\n');
+                    const lines = file.content.split('\n');
+                    totalLines += lines.length;
                     
-                    for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i];
+                    for (const line of lines) {
                         const lowerLine = line.toLowerCase();
-                        
-                        // Extract timestamps
-                        const timeMatch = line.match(patterns.timestamp);
-                        if (timeMatch) {
-                            timestamps.push(timeMatch[0]);
-                        }
-                        
-                        // Error classification
-                        if (lowerLine.includes('error')) {
-                            errorCount++;
-                            if (lowerLine.includes('critical') || lowerLine.includes('fatal') || lowerLine.includes('panic')) {
-                                criticalErrors.push(`${file.name}:${i+1} - ${line.trim()}`);
-                            }
-                        }
+                        if (lowerLine.includes('error')) errorCount++;
                         if (lowerLine.includes('warn')) warningCount++;
-                        
-                        // Leader detection
-                        const leaderMatch = line.match(patterns.leader);
-                        if (leaderMatch && !leaderInfo) {
-                            leaderInfo = {
-                                identifier: leaderMatch[1] || leaderMatch[2] || leaderMatch[3],
-                                source: file.name,
-                                context: line.trim()
-                            };
-                        }
-                        
-                        // MEV relay analysis
-                        if (patterns.relayError.test(line)) {
-                            const relayName = extractRelayName(line);
-                            if (!relayIssues.has(relayName)) {
-                                relayIssues.set(relayName, []);
-                            }
-                            relayIssues.get(relayName).push({
-                                issue: line.trim(),
-                                timestamp: timeMatch ? timeMatch[0] : `Line ${i+1}`,
-                                severity: getSeverity(line)
-                            });
-                        }
-                        
-                        // Performance metrics
-                        const blockProdMatch = line.match(patterns.blockProduction);
-                        if (blockProdMatch) {
-                            performanceMetrics.blockProductionTime.push(parseFloat(blockProdMatch[1]));
-                        }
-                        
-                        // Consensus analysis
-                        const roundMatch = line.match(patterns.consensusRound);
-                        if (roundMatch && lowerLine.includes('consensus')) {
-                            performanceMetrics.consensusRounds.push(parseInt(roundMatch[1]));
-                            if (lowerLine.includes('timeout') || lowerLine.includes('failed')) {
-                                consensusIssues.push({
-                                    round: roundMatch[1],
-                                    issue: line.trim(),
-                                    file: file.name
-                                });
-                            }
-                        }
                     }
                 }
                 
-                // Generate comprehensive report
-                analysisReport += `## Executive Summary\\n`;
-                analysisReport += `- **Analysis Date**: ${new Date().toLocaleString()}\\n`;
-                analysisReport += `- **Files Processed**: ${filesWithContent.length}\\n`;
-                analysisReport += `- **Total Log Lines**: ${filesWithContent.reduce((sum, f) => sum + f.content.split('\\n').length, 0).toLocaleString()}\\n`;
-                analysisReport += `- **Errors Found**: ${errorCount} (${criticalErrors.length} critical)\\n`;
-                analysisReport += `- **Warnings**: ${warningCount}\\n`;
-                analysisReport += `- **Time Range**: ${timestamps.length > 0 ? `${timestamps[0]} to ${timestamps[timestamps.length-1]}` : 'Not detected'}\\n\\n`;
+                report += "## Executive Summary\n";
+                report += "- Analysis Date: " + new Date().toLocaleString() + "\n";
+                report += "- Files Processed: " + filesWithContent.length + "\n";
+                report += "- Total Lines: " + totalLines + "\n";
+                report += "- Errors Found: " + errorCount + "\n";
+                report += "- Warnings Found: " + warningCount + "\n\n";
                 
-                // Critical issues first
-                if (criticalErrors.length > 0) {
-                    analysisReport += `## 🚨 CRITICAL ISSUES\\n`;
-                    criticalErrors.slice(0, 5).forEach((error, i) => {
-                        analysisReport += `${i + 1}. ${error}\\n`;
-                    });
-                    if (criticalErrors.length > 5) {
-                        analysisReport += `... and ${criticalErrors.length - 5} more critical errors\\n`;
-                    }
-                    analysisReport += `\\n`;
-                }
-                
-                // Round Leader Analysis
-                analysisReport += `## 1. Round Leader & Consensus\\n`;
-                if (leaderInfo) {
-                    analysisReport += `**DVT Consensus Leader**: \\`${leaderInfo.identifier}\\`\\n`;
-                    analysisReport += `- **Source**: ${leaderInfo.source}\\n`;
-                    analysisReport += `- **Context**: ${leaderInfo.context.substring(0, 100)}...\\n`;
-                    
-                    if (performanceMetrics.consensusRounds.length > 0) {
-                        const avgRound = performanceMetrics.consensusRounds.reduce((a, b) => a + b, 0) / performanceMetrics.consensusRounds.length;
-                        const maxRound = Math.max(...performanceMetrics.consensusRounds);
-                        analysisReport += `- **Consensus Performance**: Avg round ${avgRound.toFixed(1)}, Max round ${maxRound}\\n`;
-                    }
+                report += "## Results\n";
+                if (errorCount > 0) {
+                    report += "⚠️ " + errorCount + " errors detected - Review recommended\n";
                 } else {
-                    analysisReport += `⚠️ **No consensus leader identified**\\n`;
-                    analysisReport += `- Check if all DVT node logs are included\\n`;
+                    report += "✅ No errors detected\n";
                 }
                 
-                if (consensusIssues.length > 0) {
-                    analysisReport += `\\n**Consensus Issues** (${consensusIssues.length}):\\n`;
-                    consensusIssues.slice(0, 3).forEach((issue, i) => {
-                        analysisReport += `${i + 1}. Round ${issue.round}: ${issue.issue.substring(0, 80)}...\\n`;
-                    });
-                }
-                analysisReport += `\\n`;
-                
-                // MEV Relay Analysis
-                analysisReport += `## 2. MEV Relay Performance\\n`;
-                if (relayIssues.size > 0) {
-                    for (const [relayName, issues] of relayIssues) {
-                        const criticalIssues = issues.filter(i => i.severity === 'critical').length;
-                        const warningIssues = issues.filter(i => i.severity === 'warning').length;
-                        
-                        analysisReport += `### ${relayName}\\n`;
-                        analysisReport += `- **Status**: ❌ ISSUES DETECTED\\n`;
-                        analysisReport += `- **Total Issues**: ${issues.length} (${criticalIssues} critical, ${warningIssues} warnings)\\n`;
-                        analysisReport += `- **Latest**: ${issues[issues.length - 1].timestamp}\\n`;
-                        analysisReport += `- **Sample**: ${issues[0].issue.substring(0, 100)}...\\n\\n`;
-                    }
-                    
-                    analysisReport += `**Relay Recommendations**:\\n`;
-                    for (const [relayName, issues] of relayIssues) {
-                        const criticalCount = issues.filter(i => i.severity === 'critical').length;
-                        if (criticalCount > 2) {
-                            analysisReport += `- 🔴 **${relayName}**: Consider disabling (${criticalCount} critical issues)\\n`;
-                        } else {
-                            analysisReport += `- 🟡 **${relayName}**: Monitor closely (${issues.length} total issues)\\n`;
-                        }
-                    }
+                if (warningCount > 0) {
+                    report += "⚠️ " + warningCount + " warnings detected\n";
                 } else {
-                    analysisReport += `✅ **No major MEV relay issues detected**\\n`;
-                }
-                analysisReport += `\\n`;
-                
-                // Performance Metrics
-                if (performanceMetrics.blockProductionTime.length > 0) {
-                    const avgTime = performanceMetrics.blockProductionTime.reduce((a, b) => a + b, 0) / performanceMetrics.blockProductionTime.length;
-                    const maxTime = Math.max(...performanceMetrics.blockProductionTime);
-                    
-                    analysisReport += `## 3. Performance Metrics\\n`;
-                    analysisReport += `**Block Production**:\\n`;
-                    analysisReport += `- **Average Time**: ${avgTime.toFixed(3)}s\\n`;
-                    analysisReport += `- **Maximum Time**: ${maxTime.toFixed(3)}s\\n`;
-                    analysisReport += `- **Samples**: ${performanceMetrics.blockProductionTime.length}\\n`;
-                    
-                    if (maxTime > 2.0) {
-                        analysisReport += `- ⚠️ **Warning**: Some blocks took >2s\\n`;
-                    }
-                    analysisReport += `\\n`;
+                    report += "✅ No warnings detected\n";
                 }
                 
-                // Actionable Recommendations
-                analysisReport += `## 4. Recommendations\\n\\n`;
-                
-                if (criticalErrors.length > 0) {
-                    analysisReport += `### 🚨 Immediate Actions:\\n`;
-                    analysisReport += `1. Address ${criticalErrors.length} critical errors immediately\\n`;
-                    analysisReport += `2. Check system resources and network connectivity\\n\\n`;
+                report += "\n## File Details\n";
+                for (const file of filesWithContent) {
+                    report += "- " + file.name + " (" + file.type + "): " + file.content.split('\n').length + " lines\n";
                 }
                 
-                if (relayIssues.size > 0) {
-                    analysisReport += `### MEV Relay Optimization:\\n`;
-                    analysisReport += `1. Review timeout settings and relay endpoints\\n`;
-                    analysisReport += `2. Consider geographic relay optimization\\n`;
-                    analysisReport += `3. Implement relay response time monitoring\\n\\n`;
-                }
+                report += "\n## Recommendations\n";
+                report += "1. Review any errors found in the logs\n";
+                report += "2. Monitor warnings for potential issues\n";
+                report += "3. Set up automated log monitoring\n";
+                report += "4. Consider upgrading to AI analysis for deeper insights\n\n";
                 
-                if (consensusIssues.length > 0) {
-                    analysisReport += `### Consensus Improvements:\\n`;
-                    analysisReport += `1. Check inter-node network latency\\n`;
-                    analysisReport += `2. Review consensus timeout configurations\\n`;
-                    analysisReport += `3. Ensure all nodes are properly synchronized\\n\\n`;
-                }
+                report += "---\n";
+                report += "Generated by DVT Log Analyzer (Local Analysis)\n";
                 
-                analysisReport += `### General Optimizations:\\n`;
-                analysisReport += `1. Implement automated log monitoring and alerting\\n`;
-                analysisReport += `2. Set up performance metrics dashboards\\n`;
-                analysisReport += `3. Configure error rate threshold alerts\\n`;
-                analysisReport += `4. Plan regular client software updates\\n\\n`;
-                
-                analysisReport += `---\\n`;
-                analysisReport += `*Analysis performed using advanced pattern matching and heuristics*\\n`;
-                analysisReport += `*Generated by DVT Log Analyzer v1.0 on Netlify*`;
-                
-                return analysisReport;
-            };
-            
-            // Helper functions
-            const extractRelayName = (line) => {
-                const relayPatterns = [
-                    /flashbots/i, /bloxroute/i, /titan/i, /ultrasound/i,
-                    /eden/i, /manifold/i, /agnostic/i, /securerpc/i
-                ];
-                
-                for (const pattern of relayPatterns) {
-                    if (pattern.test(line)) {
-                        return line.match(pattern)[0].toLowerCase();
-                    }
-                }
-                return 'unknown-relay';
-            };
-            
-            const getSeverity = (line) => {
-                const lowerLine = line.toLowerCase();
-                if (lowerLine.includes('critical') || lowerLine.includes('fatal') || lowerLine.includes('panic')) {
-                    return 'critical';
-                }
-                if (lowerLine.includes('error')) {
-                    return 'error';
-                }
-                if (lowerLine.includes('warn')) {
-                    return 'warning';
-                }
-                return 'info';
+                return report;
             };
 
-            // AI Analysis using Netlify Functions
             const analyzeWithClaude = async (filesWithContent) => {
-                const prompt = `You are an expert DVT (Distributed Validator Technology) and Ethereum validator log analyzer. Analyze these log files and provide a comprehensive technical report.
-
-## LOG FILES:
-${filesWithContent.map(f => `- **${f.name}** (${f.type}): ${f.content.split('\\n').length} lines`).join('\\n')}
-
-## ANALYSIS REQUIREMENTS:
-
-### 1. ROUND LEADER IDENTIFICATION
-- Identify DVT consensus leaders for block proposals
-- Extract leader index, node identifier, or name
-- Analyze consensus round progression and timing
-
-### 2. BLOCK PROPOSAL ANALYSIS  
-- Identify missed or failed block proposals
-- Root cause analysis (timeout, relay failure, consensus issues)
-- Timeline reconstruction of proposal events
-
-### 3. MEV RELAY COMPREHENSIVE ANALYSIS
-- Identify all MEV relays and their performance
-- Categorize failures: timeouts, HTTP errors (403, 502, 500), no-bid responses
-- Compare relay response times and bid values
-- Relay-specific issues (Flashbots, BloxRoute, Titan, Ultrasound, etc.)
-
-### 4. BEACON NODE HEALTH ASSESSMENT
-- Connectivity and synchronization issues
-- API failures and performance bottlenecks
-- Peer management and discovery issues
-
-### 5. PERFORMANCE & RECOMMENDATIONS
-- Quantitative performance metrics
-- Specific, actionable recommendations
-- Configuration optimization suggestions
-
-Please provide a detailed technical analysis with evidence from the logs.
-
-## LOG CONTENTS:
-
-${filesWithContent.map(f => `### ${f.name} (${f.type.toUpperCase()})\\n\\`\\`\\`\\n${f.content.slice(0, 8000)}\\n${f.content.length > 8000 ? '[Content truncated for API limits]\\n' : ''}\\`\\`\\``).join('\\n\\n')}`;
+                const prompt = "Analyze these DVT log files and provide insights:\n\n" +
+                    filesWithContent.map(f => f.name + " (" + f.type + "): " + f.content.split('\n').length + " lines").join('\n') +
+                    "\n\nLog samples:\n" +
+                    filesWithContent.map(f => "### " + f.name + "\n" + f.content.slice(0, 3000)).join('\n\n');
 
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
@@ -450,7 +145,7 @@ ${filesWithContent.map(f => `### ${f.name} (${f.type.toUpperCase()})\\n\\`\\`\\`
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error || `HTTP ${response.status}: Request failed`);
+                    throw new Error(errorData.error || 'Request failed');
                 }
 
                 const data = await response.json();
@@ -489,12 +184,11 @@ ${filesWithContent.map(f => `### ${f.name} (${f.type.toUpperCase()})\\n\\`\\`\\`
                         timestamp: new Date().toISOString(),
                         filesAnalyzed: files.length,
                         result: result,
-                        method: useAI ? 'Claude AI (Netlify Functions)' : 'Enhanced Local Analysis'
+                        method: useAI ? 'Claude AI' : 'Local Analysis'
                     });
 
                 } catch (error) {
-                    console.error('Analysis failed:', error);
-                    alert(`Analysis failed: ${error.message}`);
+                    alert('Analysis failed: ' + error.message);
                 } finally {
                     setLoading(false);
                 }
@@ -503,20 +197,13 @@ ${filesWithContent.map(f => `### ${f.name} (${f.type.toUpperCase()})\\n\\`\\`\\`
             const downloadReport = () => {
                 if (!analysis) return;
                 
-                const report = `${analysis.result}
-
----
-Generated: ${new Date(analysis.timestamp).toLocaleString()}
-Files Analyzed: ${analysis.filesAnalyzed}
-Method: ${analysis.method}
-Generated by DVT Log Analyzer (Netlify)
-`;
+                const report = analysis.result + "\n\n---\nGenerated: " + new Date(analysis.timestamp).toLocaleString() + "\nFiles: " + analysis.filesAnalyzed + "\nMethod: " + analysis.method;
                 
                 const blob = new Blob([report], { type: 'text/markdown' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `dvt-analysis-${new Date().toISOString().split('T')[0]}.md`;
+                a.download = 'dvt-analysis-' + new Date().toISOString().split('T')[0] + '.md';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -528,78 +215,61 @@ Generated by DVT Log Analyzer (Netlify)
                     <div className="container mx-auto px-4 py-8">
                         {/* Header */}
                         <div className="text-center mb-12">
-                            <div className="flex justify-center items-center gap-3 mb-4">
-                                <Activity size={48} className="text-blue-400" />
-                                <h1 className="text-4xl font-bold text-white">DVT Log Analyzer</h1>
-                            </div>
-                            <p className="text-gray-300 text-lg max-w-2xl mx-auto">
-                                Upload your DVT, MEV, and beacon node logs for intelligent analysis. 
-                                Choose between enhanced local analysis or AI-powered insights with Claude.
+                            <h1 className="text-4xl font-bold text-white mb-4">DVT Log Analyzer</h1>
+                            <p className="text-gray-300 text-lg">
+                                Upload your DVT, MEV, and beacon node logs for intelligent analysis
                             </p>
+                            <div className="mt-4 inline-block bg-green-500/20 text-green-300 px-4 py-2 rounded-full text-sm">
+                                ✅ Successfully deployed on Netlify
+                            </div>
                         </div>
 
                         <div className="grid lg:grid-cols-2 gap-8">
-                            {/* Left Column - Controls */}
+                            {/* Left Column */}
                             <div className="space-y-6">
                                 {/* Analysis Method */}
-                                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
-                                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                                        <Zap size={20} />
-                                        Analysis Method
-                                    </h2>
+                                <div className="bg-white/10 rounded-xl p-6 border border-white/20">
+                                    <h2 className="text-xl font-bold text-white mb-4">Analysis Method</h2>
                                     
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-3">
+                                    <div className="space-y-3">
+                                        <label className="flex items-center gap-3 text-white cursor-pointer">
                                             <input
                                                 type="radio"
-                                                id="local"
-                                                name="analysisMethod"
                                                 checked={!useAI}
                                                 onChange={() => setUseAI(false)}
-                                                className="text-blue-500"
                                             />
-                                            <label htmlFor="local" className="text-white font-medium">
-                                                Enhanced Local Analysis (Recommended)
-                                            </label>
-                                        </div>
+                                            Local Analysis (Recommended)
+                                        </label>
                                         <p className="text-gray-400 text-sm ml-6">
-                                            Advanced pattern matching and heuristics. Secure and private.
+                                            Fast pattern matching. Works instantly.
                                         </p>
                                         
-                                        <div className="flex items-center gap-3">
+                                        <label className="flex items-center gap-3 text-white cursor-pointer">
                                             <input
                                                 type="radio"
-                                                id="ai"
-                                                name="analysisMethod"
                                                 checked={useAI}
                                                 onChange={() => setUseAI(true)}
-                                                className="text-blue-500"
                                             />
-                                            <label htmlFor="ai" className="text-white font-medium">
-                                                Claude AI Analysis (Netlify Functions)
-                                            </label>
-                                        </div>
+                                            Claude AI Analysis
+                                        </label>
                                         <p className="text-gray-400 text-sm ml-6">
-                                            Deep AI analysis using secure serverless functions.
+                                            Deep AI analysis via Netlify functions.
                                         </p>
                                     </div>
                                 </div>
 
                                 {/* File Upload */}
-                                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
-                                    <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                                        <Upload size={24} />
-                                        Upload Log Files
-                                    </h2>
+                                <div className="bg-white/10 rounded-xl p-6 border border-white/20">
+                                    <h2 className="text-xl font-bold text-white mb-4">Upload Log Files</h2>
                                     
                                     <div 
-                                        className="upload-area border-2 border-dashed border-white/30 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                                        className="border-2 border-dashed border-white/30 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
                                         onClick={() => fileInputRef.current?.click()}
                                     >
-                                        <FileText size={48} className="text-gray-400 mx-auto mb-4" />
+                                        <div className="text-4xl mb-4">📄</div>
                                         <p className="text-white font-medium mb-2">Click to upload log files</p>
                                         <p className="text-gray-400 text-sm">
-                                            Support: Charon, Lighthouse, MEV-boost, Beacon, Lodestar logs
+                                            Support: .log, .txt, .csv files
                                         </p>
                                         <input
                                             ref={fileInputRef}
@@ -607,45 +277,24 @@ Generated by DVT Log Analyzer (Netlify)
                                             multiple
                                             accept=".log,.txt,.csv"
                                             onChange={handleFileUpload}
-                                            className="hidden"
+                                            style={{ display: 'none' }}
                                         />
-                                    </div>
-
-                                    {/* File Type Legend */}
-                                    <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                                        {['charon', 'lighthouse', 'mev-boost', 'beacon', 'lodestar'].map(type => (
-                                            <div key={type} className="flex items-center gap-2">
-                                                <div className={`px-2 py-1 rounded text-xs font-medium ${getFileTypeColor(type)}`}>
-                                                    {type}
-                                                </div>
-                                            </div>
-                                        ))}
                                     </div>
                                 </div>
 
                                 {/* Uploaded Files */}
                                 {files.length > 0 && (
-                                    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
-                                        <h3 className="text-xl font-bold text-white mb-4">Uploaded Files ({files.length})</h3>
+                                    <div className="bg-white/10 rounded-xl p-6 border border-white/20">
+                                        <h3 className="text-xl font-bold text-white mb-4">
+                                            Uploaded Files ({files.length})
+                                        </h3>
                                         <div className="space-y-3 max-h-60 overflow-y-auto">
                                             {files.map(file => (
-                                                <div key={file.id} className="bg-white/5 rounded-lg p-3 flex items-center justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <FileText size={20} className="text-gray-400" />
-                                                        <div>
-                                                            <p className="text-white font-medium truncate max-w-48">{file.name}</p>
-                                                            <p className="text-gray-400 text-sm">{formatFileSize(file.size)}</p>
-                                                        </div>
-                                                        <span className={`px-2 py-1 rounded text-xs font-medium ${getFileTypeColor(file.type)}`}>
-                                                            {file.type}
-                                                        </span>
-                                                    </div>
-                                                    <button 
-                                                        onClick={() => removeFile(file.id)}
-                                                        className="text-red-400 hover:text-red-300 p-1"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
+                                                <div key={file.id} className="bg-white/5 rounded-lg p-3">
+                                                    <p className="text-white font-medium">{file.name}</p>
+                                                    <p className="text-gray-400 text-sm">
+                                                        {formatFileSize(file.size)} • {file.type}
+                                                    </p>
                                                 </div>
                                             ))}
                                         </div>
@@ -656,114 +305,75 @@ Generated by DVT Log Analyzer (Netlify)
                                 <button
                                     onClick={analyze}
                                     disabled={loading || files.length === 0}
-                                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
+                                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:bg-gray-500 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200"
                                 >
                                     {loading ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                            {useAI ? 'Analyzing with Claude AI...' : 'Performing Enhanced Analysis...'}
-                                        </>
+                                        useAI ? 'Analyzing with Claude AI...' : 'Analyzing Logs...'
                                     ) : (
-                                        <>
-                                            <Zap size={20} />
-                                            {useAI ? 'Analyze with Claude AI' : 'Analyze Logs (Enhanced)'}
-                                        </>
+                                        useAI ? 'Analyze with Claude AI' : 'Analyze Logs'
                                     )}
                                 </button>
                             </div>
 
-                            {/* Right Column - Results */}
+                            {/* Right Column */}
                             <div className="space-y-6">
-                                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
-                                    <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                                        <Activity size={24} />
-                                        Analysis Results
-                                    </h2>
+                                <div className="bg-white/10 rounded-xl p-6 border border-white/20">
+                                    <h2 className="text-xl font-bold text-white mb-4">Analysis Results</h2>
                                     
                                     {!analysis ? (
                                         <div className="text-center py-12">
-                                            <Activity size={64} className="text-gray-400 mx-auto mb-4" />
-                                            <p className="text-gray-400">Upload log files and click analyze to get started</p>
-                                            <p className="text-gray-500 text-sm mt-2">
-                                                Choose between local analysis or AI-powered insights
-                                            </p>
+                                            <div className="text-4xl mb-4">📊</div>
+                                            <p className="text-gray-400">Upload log files and click analyze</p>
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
                                             <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <CheckCircle size={20} className="text-green-400" />
-                                                    <span className="text-white font-medium">Analysis Complete</span>
-                                                    <span className="text-blue-300 text-sm">({analysis.method})</span>
-                                                </div>
+                                                <span className="text-green-400 font-medium">✅ Analysis Complete</span>
                                                 <button
                                                     onClick={downloadReport}
-                                                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm transition-colors"
+                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
                                                 >
-                                                    <Download size={16} />
-                                                    Download
+                                                    💾 Download
                                                 </button>
                                             </div>
                                             
                                             <div className="bg-black/30 rounded-lg p-4 max-h-96 overflow-y-auto">
-                                                <pre className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">
+                                                <pre className="text-gray-300 text-sm whitespace-pre-wrap">
                                                     {analysis.result}
                                                 </pre>
                                             </div>
                                             
                                             <div className="text-gray-400 text-sm">
                                                 Generated: {new Date(analysis.timestamp).toLocaleString()} | 
-                                                Files analyzed: {analysis.filesAnalyzed} | 
+                                                Files: {analysis.filesAnalyzed} | 
                                                 Method: {analysis.method}
                                             </div>
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Quick Stats */}
+                                {/* Stats */}
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/20 text-center">
-                                        <FileText size={32} className="text-blue-400 mx-auto mb-2" />
+                                    <div className="bg-white/10 rounded-xl p-4 text-center">
+                                        <div className="text-2xl mb-2">📁</div>
                                         <p className="text-white font-bold text-xl">{files.length}</p>
-                                        <p className="text-gray-400 text-sm">Files Uploaded</p>
+                                        <p className="text-gray-400 text-sm">Files</p>
                                     </div>
-                                    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/20 text-center">
-                                        <AlertCircle size={32} className="text-orange-400 mx-auto mb-2" />
+                                    <div className="bg-white/10 rounded-xl p-4 text-center">
+                                        <div className="text-2xl mb-2">⚡</div>
                                         <p className="text-white font-bold text-xl">{analysis ? '✓' : '—'}</p>
-                                        <p className="text-gray-400 text-sm">Analysis Status</p>
+                                        <p className="text-gray-400 text-sm">Status</p>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* Features Section */}
-                        <div className="mt-16 grid md:grid-cols-3 gap-6">
-                            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20 text-center">
-                                <Activity size={48} className="text-blue-400 mx-auto mb-4" />
-                                <h3 className="text-white font-bold text-lg mb-2">Round Leader Detection</h3>
-                                <p className="text-gray-400">Automatically identify DVT consensus leaders and failed proposals</p>
-                            </div>
-                            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20 text-center">
-                                <Zap size={48} className="text-green-400 mx-auto mb-4" />
-                                <h3 className="text-white font-bold text-lg mb-2">MEV Relay Analysis</h3>
-                                <p className="text-gray-400">Identify failing relays, timeouts, and optimization opportunities</p>
-                            </div>
-                            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20 text-center">
-                                <FileText size={48} className="text-purple-400 mx-auto mb-4" />
-                                <h3 className="text-white font-bold text-lg mb-2">Beacon Node Issues</h3>
-                                <p className="text-gray-400">Detect sync problems, API failures, and performance bottlenecks</p>
                             </div>
                         </div>
 
                         {/* Footer */}
                         <div className="mt-12 text-center">
-                            <div className="bg-blue-900/30 rounded-xl p-6 border border-blue-500/30">
-                                <div className="flex items-center justify-center gap-3 mb-4">
-                                    <CheckCircle size={24} className="text-green-400" />
-                                    <h3 className="text-blue-200 font-medium">Deployed on Netlify</h3>
-                                </div>
-                                <p className="text-blue-300 text-sm">
-                                    Secure serverless functions • Auto-deploy from GitHub • Free hosting with SSL
+                            <div className="bg-green-900/30 rounded-xl p-6 border border-green-500/30">
+                                <h3 className="text-green-200 font-medium mb-2">🚀 Successfully Deployed!</h3>
+                                <p className="text-green-300 text-sm">
+                                    Auto-deploy from GitHub • Secure API handling • Lightning fast
                                 </p>
                             </div>
                         </div>
