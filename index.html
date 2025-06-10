@@ -74,57 +74,271 @@
                 });
             };
 
+            // Helper function for relay name extraction
+            const extractRelayName = (line) => {
+                const lowerLine = line.toLowerCase();
+                if (lowerLine.includes('flashbots')) return 'flashbots';
+                if (lowerLine.includes('bloxroute')) return 'bloxroute';
+                if (lowerLine.includes('titan')) return 'titan';
+                if (lowerLine.includes('ultrasound')) return 'ultrasound';
+                if (lowerLine.includes('eden')) return 'eden';
+                if (lowerLine.includes('manifold')) return 'manifold';
+                if (lowerLine.includes('agnostic')) return 'agnostic';
+                if (lowerLine.includes('securerpc')) return 'securerpc';
+                return 'unknown-relay';
+            };
+
+            // Enhanced Local Analysis Function
             const analyzeLogsLocally = async (filesWithContent) => {
-                let report = "# DVT Log Analysis Report\n\n";
+                let report = "# DVT Log Analysis Report (Enhanced Local Analysis)\n\n";
                 
                 let errorCount = 0;
                 let warningCount = 0;
+                let criticalErrors = [];
                 let totalLines = 0;
+                let consensusEvents = [];
+                let relayIssues = [];
+                let beaconIssues = [];
+                let performanceIssues = [];
+                let timestamps = [];
                 
+                // Advanced pattern matching
+                const patterns = {
+                    critical: /critical|fatal|panic|emergency/i,
+                    consensus: /qbft|consensus|leader|round|decided/i,
+                    relay: /relay|mev|flashbots|bloxroute|titan|ultrasound/i,
+                    beacon: /beacon|sync|peer|attestation/i,
+                    performance: /timeout|slow|delay|lag/i,
+                    timestamp: /\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}/
+                };
+                
+                // Analyze each file with advanced intelligence
                 for (const file of filesWithContent) {
                     const lines = file.content.split('\n');
                     totalLines += lines.length;
                     
-                    for (const line of lines) {
+                    report += `### Analyzing ${file.name} (${file.type.toUpperCase()})\n`;
+                    report += `- Lines: ${lines.length.toLocaleString()}\n`;
+                    report += `- Size: ${(file.content.length / 1024).toFixed(1)}KB\n\n`;
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i];
                         const lowerLine = line.toLowerCase();
-                        if (lowerLine.includes('error')) errorCount++;
+                        
+                        // Extract timestamps for timeline
+                        const timeMatch = line.match(patterns.timestamp);
+                        if (timeMatch) timestamps.push(timeMatch[0]);
+                        
+                        // Error classification
+                        if (lowerLine.includes('error')) {
+                            errorCount++;
+                            if (patterns.critical.test(line)) {
+                                criticalErrors.push({
+                                    file: file.name,
+                                    line: i + 1,
+                                    content: line.trim(),
+                                    timestamp: timeMatch ? timeMatch[0] : 'Unknown'
+                                });
+                            }
+                        }
+                        
                         if (lowerLine.includes('warn')) warningCount++;
+                        
+                        // Consensus analysis
+                        if (patterns.consensus.test(line)) {
+                            consensusEvents.push({
+                                file: file.name,
+                                line: i + 1,
+                                content: line.trim(),
+                                timestamp: timeMatch ? timeMatch[0] : 'Unknown',
+                                type: lowerLine.includes('leader') ? 'leader' : 
+                                      lowerLine.includes('round') ? 'round' : 'consensus'
+                            });
+                        }
+                        
+                        // Relay analysis
+                        if (patterns.relay.test(line) && (lowerLine.includes('error') || lowerLine.includes('timeout') || lowerLine.includes('failed'))) {
+                            relayIssues.push({
+                                file: file.name,
+                                line: i + 1,
+                                content: line.trim(),
+                                timestamp: timeMatch ? timeMatch[0] : 'Unknown',
+                                relay: extractRelayName(line)
+                            });
+                        }
+                        
+                        // Beacon node analysis
+                        if (patterns.beacon.test(line) && (lowerLine.includes('error') || lowerLine.includes('warn'))) {
+                            beaconIssues.push({
+                                file: file.name,
+                                line: i + 1,
+                                content: line.trim(),
+                                timestamp: timeMatch ? timeMatch[0] : 'Unknown'
+                            });
+                        }
+                        
+                        // Performance analysis
+                        if (patterns.performance.test(line)) {
+                            performanceIssues.push({
+                                file: file.name,
+                                line: i + 1,
+                                content: line.trim(),
+                                timestamp: timeMatch ? timeMatch[0] : 'Unknown'
+                            });
+                        }
                     }
                 }
                 
-                report += "## Executive Summary\n";
-                report += "- Analysis Date: " + new Date().toLocaleString() + "\n";
-                report += "- Files Processed: " + filesWithContent.length + "\n";
-                report += "- Total Lines: " + totalLines + "\n";
-                report += "- Errors Found: " + errorCount + "\n";
-                report += "- Warnings Found: " + warningCount + "\n\n";
+                // Generate comprehensive report
+                report += `## 📊 Executive Summary\n`;
+                report += `- **Analysis Date**: ${new Date().toLocaleString()}\n`;
+                report += `- **Files Processed**: ${filesWithContent.length}\n`;
+                report += `- **Total Lines**: ${totalLines.toLocaleString()}\n`;
+                report += `- **Time Range**: ${timestamps.length > 0 ? `${timestamps[0]} to ${timestamps[timestamps.length-1]}` : 'Not detected'}\n`;
+                report += `- **Critical Issues**: ${criticalErrors.length}\n`;
+                report += `- **Total Errors**: ${errorCount}\n`;
+                report += `- **Total Warnings**: ${warningCount}\n\n`;
                 
-                report += "## Results\n";
-                if (errorCount > 0) {
-                    report += "⚠️ " + errorCount + " errors detected - Review recommended\n";
+                // Health Score
+                const healthScore = Math.max(0, 100 - (criticalErrors.length * 20) - (errorCount * 2) - (warningCount * 1));
+                report += `### 🏥 Health Score: ${healthScore}/100\n`;
+                if (healthScore >= 80) report += `✅ **Excellent** - System appears healthy\n`;
+                else if (healthScore >= 60) report += `⚠️ **Good** - Minor issues detected\n`;
+                else if (healthScore >= 40) report += `🟠 **Warning** - Several issues need attention\n`;
+                else report += `🔴 **Critical** - Immediate action required\n\n`;
+                
+                // Critical Errors Section
+                if (criticalErrors.length > 0) {
+                    report += `## 🚨 CRITICAL ISSUES (${criticalErrors.length})\n`;
+                    criticalErrors.slice(0, 5).forEach((error, i) => {
+                        report += `### ${i + 1}. ${error.file}:${error.line}\n`;
+                        report += `**Time**: ${error.timestamp}\n`;
+                        report += `**Error**: \`${error.content.substring(0, 100)}...\`\n\n`;
+                    });
+                    if (criticalErrors.length > 5) {
+                        report += `*...and ${criticalErrors.length - 5} more critical errors*\n\n`;
+                    }
+                }
+                
+                // Consensus Analysis
+                if (consensusEvents.length > 0) {
+                    report += `## 🤝 Consensus Analysis (${consensusEvents.length} events)\n`;
+                    
+                    // Find leader information
+                    const leaderEvents = consensusEvents.filter(e => e.type === 'leader');
+                    if (leaderEvents.length > 0) {
+                        const latestLeader = leaderEvents[leaderEvents.length - 1];
+                        report += `**Current Leader**: Detected in ${latestLeader.file}\n`;
+                        report += `**Details**: \`${latestLeader.content.substring(0, 80)}...\`\n\n`;
+                    }
+                    
+                    // Round analysis
+                    const roundEvents = consensusEvents.filter(e => e.type === 'round');
+                    if (roundEvents.length > 0) {
+                        report += `**Consensus Rounds**: ${roundEvents.length} round events detected\n`;
+                        const lastRound = roundEvents[roundEvents.length - 1];
+                        report += `**Latest**: \`${lastRound.content.substring(0, 80)}...\`\n\n`;
+                    }
                 } else {
-                    report += "✅ No errors detected\n";
+                    report += `## 🤝 Consensus Analysis\n`;
+                    report += `⚠️ **No consensus events detected** - May indicate:\n`;
+                    report += `- Logs don't cover consensus activity\n`;
+                    report += `- Node not participating in consensus\n`;
+                    report += `- Different log format than expected\n\n`;
                 }
                 
-                if (warningCount > 0) {
-                    report += "⚠️ " + warningCount + " warnings detected\n";
+                // MEV Relay Analysis
+                if (relayIssues.length > 0) {
+                    report += `## 📡 MEV Relay Analysis (${relayIssues.length} issues)\n`;
+                    
+                    // Group by relay
+                    const relayGroups = {};
+                    relayIssues.forEach(issue => {
+                        if (!relayGroups[issue.relay]) relayGroups[issue.relay] = [];
+                        relayGroups[issue.relay].push(issue);
+                    });
+                    
+                    for (const [relay, issues] of Object.entries(relayGroups)) {
+                        report += `### ${relay.toUpperCase()}\n`;
+                        report += `- **Issues**: ${issues.length}\n`;
+                        report += `- **Latest**: ${issues[issues.length - 1].timestamp}\n`;
+                        report += `- **Sample**: \`${issues[0].content.substring(0, 80)}...\`\n\n`;
+                    }
+                    
+                    // Recommendations
+                    report += `**Relay Recommendations**:\n`;
+                    for (const [relay, issues] of Object.entries(relayGroups)) {
+                        if (issues.length > 3) {
+                            report += `- 🔴 **${relay}**: Consider disabling (${issues.length} issues)\n`;
+                        } else {
+                            report += `- 🟡 **${relay}**: Monitor closely (${issues.length} issues)\n`;
+                        }
+                    }
+                    report += `\n`;
                 } else {
-                    report += "✅ No warnings detected\n";
+                    report += `## 📡 MEV Relay Analysis\n`;
+                    report += `✅ **No relay issues detected**\n\n`;
                 }
                 
-                report += "\n## File Details\n";
-                for (const file of filesWithContent) {
-                    report += "- " + file.name + " (" + file.type + "): " + file.content.split('\n').length + " lines\n";
+                // Beacon Node Health
+                if (beaconIssues.length > 0) {
+                    report += `## 🗼 Beacon Node Health (${beaconIssues.length} issues)\n`;
+                    beaconIssues.slice(0, 3).forEach((issue, i) => {
+                        report += `${i + 1}. **${issue.file}** (${issue.timestamp}): \`${issue.content.substring(0, 60)}...\`\n`;
+                    });
+                    if (beaconIssues.length > 3) {
+                        report += `*...and ${beaconIssues.length - 3} more beacon issues*\n`;
+                    }
+                    report += `\n`;
+                } else {
+                    report += `## 🗼 Beacon Node Health\n`;
+                    report += `✅ **No beacon node issues detected**\n\n`;
                 }
                 
-                report += "\n## Recommendations\n";
-                report += "1. Review any errors found in the logs\n";
-                report += "2. Monitor warnings for potential issues\n";
-                report += "3. Set up automated log monitoring\n";
-                report += "4. Consider upgrading to AI analysis for deeper insights\n\n";
+                // Performance Analysis
+                if (performanceIssues.length > 0) {
+                    report += `## ⚡ Performance Analysis (${performanceIssues.length} issues)\n`;
+                    performanceIssues.slice(0, 3).forEach((issue, i) => {
+                        report += `${i + 1}. **${issue.timestamp}**: \`${issue.content.substring(0, 80)}...\`\n`;
+                    });
+                    report += `\n`;
+                }
                 
-                report += "---\n";
-                report += "Generated by DVT Log Analyzer (Local Analysis)\n";
+                // Actionable Recommendations
+                report += `## 🎯 Actionable Recommendations\n\n`;
+                
+                if (criticalErrors.length > 0) {
+                    report += `### 🚨 IMMEDIATE ACTIONS:\n`;
+                    report += `1. **Address ${criticalErrors.length} critical errors** immediately\n`;
+                    report += `2. **Check system resources** (CPU, memory, disk space)\n`;
+                    report += `3. **Verify network connectivity** to peers and relays\n\n`;
+                }
+                
+                if (relayIssues.length > 5) {
+                    report += `### 📡 MEV Relay Optimization:\n`;
+                    report += `1. **Review relay endpoints** and timeout configurations\n`;
+                    report += `2. **Consider geographic relay selection** for lower latency\n`;
+                    report += `3. **Implement relay health monitoring** and alerts\n\n`;
+                }
+                
+                if (consensusEvents.length === 0) {
+                    report += `### 🤝 Consensus Monitoring:\n`;
+                    report += `1. **Verify DVT node participation** in consensus\n`;
+                    report += `2. **Check inter-node communication** and network latency\n`;
+                    report += `3. **Review consensus configuration** and timeouts\n\n`;
+                }
+                
+                report += `### 📊 General Optimizations:\n`;
+                report += `1. **Implement automated log monitoring** with alerts\n`;
+                report += `2. **Set up performance dashboards** for real-time visibility\n`;
+                report += `3. **Plan regular maintenance windows** for updates\n`;
+                report += `4. **Document incident response procedures**\n`;
+                report += `5. **Consider log aggregation tools** for better analysis\n\n`;
+                
+                report += `---\n`;
+                report += `*Enhanced Local Analysis by DVT Log Analyzer*\n`;
+                report += `*Processed ${totalLines.toLocaleString()} lines in ${filesWithContent.length} files*\n`;
+                report += `*For AI-powered insights, try the Claude AI analysis option*`;
                 
                 return report;
             };
@@ -184,7 +398,7 @@
                         timestamp: new Date().toISOString(),
                         filesAnalyzed: files.length,
                         result: result,
-                        method: useAI ? 'Claude AI' : 'Local Analysis'
+                        method: useAI ? 'Claude AI (Fast)' : 'Enhanced Local Analysis'
                     });
 
                 } catch (error) {
@@ -220,7 +434,7 @@
                                 Upload your DVT, MEV, and beacon node logs for intelligent analysis
                             </p>
                             <div className="mt-4 inline-block bg-green-500/20 text-green-300 px-4 py-2 rounded-full text-sm">
-                                ✅ Successfully deployed on Netlify
+                                ✅ Enhanced Local Analysis • ⚡ Ultra-Fast AI Analysis
                             </div>
                         </div>
 
@@ -238,10 +452,10 @@
                                                 checked={!useAI}
                                                 onChange={() => setUseAI(false)}
                                             />
-                                            Local Analysis (Recommended)
+                                            Enhanced Local Analysis (Recommended)
                                         </label>
                                         <p className="text-gray-400 text-sm ml-6">
-                                            Fast pattern matching. Works instantly.
+                                            🏥 Health scoring • 📊 Advanced patterns • ⚡ Instant results
                                         </p>
                                         
                                         <label className="flex items-center gap-3 text-white cursor-pointer">
@@ -250,11 +464,21 @@
                                                 checked={useAI}
                                                 onChange={() => setUseAI(true)}
                                             />
-                                            Claude AI Analysis
+                                            Claude AI Analysis (Ultra-Fast)
                                         </label>
                                         <p className="text-gray-400 text-sm ml-6">
-                                            Deep AI analysis via Netlify functions.
+                                            🤖 AI insights • 🚀 Optimized for speed • 📝 Concise reports
                                         </p>
+                                    </div>
+
+                                    {/* Pro Tips */}
+                                    <div className="mt-4 bg-blue-900/30 rounded-lg p-4 border border-blue-500/30">
+                                        <h4 className="text-blue-200 font-medium mb-2">💡 Pro Tips:</h4>
+                                        <ul className="text-blue-300 text-sm space-y-1">
+                                            <li>• <strong>Local Analysis</strong>: Instant, detailed, works offline</li>
+                                            <li>• <strong>AI Analysis</strong>: Quick insights, optimized for speed</li>
+                                            <li>• <strong>Large files?</strong> Use Local Analysis for best results</li>
+                                        </ul>
                                     </div>
                                 </div>
 
@@ -269,7 +493,7 @@
                                         <div className="text-4xl mb-4">📄</div>
                                         <p className="text-white font-medium mb-2">Click to upload log files</p>
                                         <p className="text-gray-400 text-sm">
-                                            Support: .log, .txt, .csv files
+                                            Support: Charon, Lighthouse, MEV-boost, Beacon, Lodestar logs
                                         </p>
                                         <input
                                             ref={fileInputRef}
@@ -279,6 +503,26 @@
                                             onChange={handleFileUpload}
                                             style={{ display: 'none' }}
                                         />
+                                    </div>
+
+                                    {/* File Type Legend */}
+                                    <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-3 h-3 bg-purple-500 rounded"></span>
+                                            <span className="text-gray-300">Charon</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-3 h-3 bg-blue-500 rounded"></span>
+                                            <span className="text-gray-300">Lighthouse</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-3 h-3 bg-green-500 rounded"></span>
+                                            <span className="text-gray-300">MEV-boost</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-3 h-3 bg-orange-500 rounded"></span>
+                                            <span className="text-gray-300">Beacon</span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -291,10 +535,20 @@
                                         <div className="space-y-3 max-h-60 overflow-y-auto">
                                             {files.map(file => (
                                                 <div key={file.id} className="bg-white/5 rounded-lg p-3">
-                                                    <p className="text-white font-medium">{file.name}</p>
-                                                    <p className="text-gray-400 text-sm">
-                                                        {formatFileSize(file.size)} • {file.type}
-                                                    </p>
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <p className="text-white font-medium">{file.name}</p>
+                                                            <p className="text-gray-400 text-sm">
+                                                                {formatFileSize(file.size)} • {file.type}
+                                                            </p>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => setFiles(files.filter(f => f.id !== file.id))}
+                                                            className="text-red-400 hover:text-red-300 text-sm"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -308,9 +562,9 @@
                                     className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:bg-gray-500 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200"
                                 >
                                     {loading ? (
-                                        useAI ? 'Analyzing with Claude AI...' : 'Analyzing Logs...'
+                                        useAI ? '🤖 Analyzing with Claude AI...' : '⚡ Performing Enhanced Analysis...'
                                     ) : (
-                                        useAI ? 'Analyze with Claude AI' : 'Analyze Logs'
+                                        useAI ? '🤖 Analyze with Claude AI' : '⚡ Analyze Logs (Enhanced)'
                                     )}
                                 </button>
                             </div>
@@ -324,11 +578,17 @@
                                         <div className="text-center py-12">
                                             <div className="text-4xl mb-4">📊</div>
                                             <p className="text-gray-400">Upload log files and click analyze</p>
+                                            <p className="text-gray-500 text-sm mt-2">
+                                                Ready to process your DVT logs with enhanced intelligence
+                                            </p>
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
                                             <div className="flex items-center justify-between">
-                                                <span className="text-green-400 font-medium">✅ Analysis Complete</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-green-400 font-medium">✅ Analysis Complete</span>
+                                                    <span className="text-blue-300 text-sm">({analysis.method})</span>
+                                                </div>
                                                 <button
                                                     onClick={downloadReport}
                                                     className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
@@ -357,32 +617,3 @@
                                     <div className="bg-white/10 rounded-xl p-4 text-center">
                                         <div className="text-2xl mb-2">📁</div>
                                         <p className="text-white font-bold text-xl">{files.length}</p>
-                                        <p className="text-gray-400 text-sm">Files</p>
-                                    </div>
-                                    <div className="bg-white/10 rounded-xl p-4 text-center">
-                                        <div className="text-2xl mb-2">⚡</div>
-                                        <p className="text-white font-bold text-xl">{analysis ? '✓' : '—'}</p>
-                                        <p className="text-gray-400 text-sm">Status</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="mt-12 text-center">
-                            <div className="bg-green-900/30 rounded-xl p-6 border border-green-500/30">
-                                <h3 className="text-green-200 font-medium mb-2">🚀 Successfully Deployed!</h3>
-                                <p className="text-green-300 text-sm">
-                                    Auto-deploy from GitHub • Secure API handling • Lightning fast
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        ReactDOM.render(<DVTLogAnalyzer />, document.getElementById('root'));
-    </script>
-</body>
-</html>
