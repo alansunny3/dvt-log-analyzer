@@ -3,8 +3,6 @@
   
 [functions]
   directory = "netlify/functions"
-  # Increase timeout to 60 seconds for AI analysis
-  timeout = "60s"
 
 [[redirects]]
   from = "/api/*"
