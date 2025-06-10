@@ -1,85 +1,151 @@
-// Add this to your index.html inside the Analysis Method section:
+exports.handler = async (event, context) => {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type': 'application/json',
+  };
 
-// Replace the analysis method section with this enhanced version:
-React.createElement('div', { className: "bg-white/10 rounded-xl p-6 border border-white/20" },
-    React.createElement('h2', { className: "text-xl font-bold text-white mb-4" }, "Analysis Method"),
-    React.createElement('div', { className: "space-y-4" },
-        // Local Analysis Option
-        React.createElement('div', { 
-            className: `p-4 rounded-lg border-2 cursor-pointer transition-all ${!useAI ? 'border-blue-500 bg-blue-500/10' : 'border-white/20 hover:border-blue-400'}` ,
-            onClick: () => setUseAI(false)
-        },
-            React.createElement('div', { className: "flex items-center gap-3 mb-2" },
-                React.createElement('input', {
-                    type: "radio",
-                    checked: !useAI,
-                    onChange: () => setUseAI(false)
-                }),
-                React.createElement('span', { className: "text-white font-medium" }, "Enhanced Local Analysis"),
-                React.createElement('span', { className: "bg-green-500 text-white px-2 py-1 rounded text-xs" }, "RECOMMENDED")
-            ),
-            React.createElement('div', { className: "text-sm text-gray-300 ml-6" },
-                React.createElement('div', { className: "mb-2" }, "🏥 Health scoring • 📊 Advanced patterns • ⚡ Instant results"),
-                React.createElement('div', { className: "text-green-300" }, "✅ Works with any file size • ✅ Comprehensive analysis • ✅ Always reliable")
-            )
-        ),
-        
-        // AI Analysis Option
-        React.createElement('div', { 
-            className: `p-4 rounded-lg border-2 cursor-pointer transition-all ${useAI ? 'border-purple-500 bg-purple-500/10' : 'border-white/20 hover:border-purple-400'}`,
-            onClick: () => setUseAI(true)
-        },
-            React.createElement('div', { className: "flex items-center gap-3 mb-2" },
-                React.createElement('input', {
-                    type: "radio", 
-                    checked: useAI,
-                    onChange: () => setUseAI(true)
-                }),
-                React.createElement('span', { className: "text-white font-medium" }, "Claude AI Analysis"),
-                React.createElement('span', { className: "bg-purple-500 text-white px-2 py-1 rounded text-xs" }, "QUICK INSIGHTS")
-            ),
-            React.createElement('div', { className: "text-sm text-gray-300 ml-6" },
-                React.createElement('div', { className: "mb-2" }, "🤖 AI insights • 🚀 Ultra-fast (when it works) • 📝 Concise"),
-                React.createElement('div', { className: "text-yellow-300" }, "⚠️ May timeout with large files • ⚠️ Limited detail • ⚠️ Best for quick checks")
-            )
-        )
-    ),
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
+  }
+
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method not allowed' }),
+    };
+  }
+
+  try {
+    const { prompt } = JSON.parse(event.body || '{}');
     
-    // File Size Warning
-    files.length > 0 && (() => {
-        const totalSize = files.reduce((sum, f) => sum + f.size, 0);
-        const totalSizeMB = totalSize / (1024 * 1024);
-        
-        if (totalSizeMB > 1 && useAI) {
-            return React.createElement('div', { className: "mt-4 bg-yellow-900/30 rounded-lg p-4 border border-yellow-500/30" },
-                React.createElement('div', { className: "flex items-start gap-3" },
-                    React.createElement('div', { className: "text-yellow-400 text-xl" }, "⚠️"),
-                    React.createElement('div', {},
-                        React.createElement('h4', { className: "text-yellow-200 font-medium mb-1" }, 
-                            `Large Files Detected (${totalSizeMB.toFixed(1)}MB)`
-                        ),
-                        React.createElement('p', { className: "text-yellow-300 text-sm mb-2" },
-                            "AI analysis may timeout with files this large. Enhanced Local Analysis is recommended."
-                        ),
-                        React.createElement('button', {
-                            onClick: () => setUseAI(false),
-                            className: "bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
-                        }, "Switch to Local Analysis")
-                    )
-                )
-            );
-        }
-        return null;
-    })(),
+    if (!prompt) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Missing prompt' }),
+      };
+    }
+
+    const apiKey = process.env.CLAUDE_API_KEY;
+    if (!apiKey) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'API key not configured' }),
+      };
+    }
+
+    // Extract only critical information for speed
+    const lines = prompt.split('\n');
+    let criticalContent = 'DVT Log Analysis Request:\n\n';
     
-    // Pro Tips
-    React.createElement('div', { className: "mt-4 bg-blue-900/30 rounded-lg p-4 border border-blue-500/30" },
-        React.createElement('h4', { className: "text-blue-200 font-medium mb-2" }, "💡 Pro Tips:"),
-        React.createElement('ul', { className: "text-blue-300 text-sm space-y-1" },
-            React.createElement('li', {}, "• Enhanced Local Analysis rivals professional tools"),
-            React.createElement('li', {}, "• AI Analysis works best with files under 1MB"),
-            React.createElement('li', {}, "• For large files, Local Analysis is faster and more reliable"),
-            React.createElement('li', {}, "• Both methods provide actionable recommendations")
-        )
-    )
-)
+    const errorLines = [];
+    const consensusLines = [];
+    const relayLines = [];
+    
+    // Scan first 500 lines only
+    for (let i = 0; i < Math.min(lines.length, 500); i++) {
+      const line = lines[i].toLowerCase();
+      
+      if (line.includes('error') && (line.includes('critical') || line.includes('fatal'))) {
+        if (errorLines.length < 3) errorLines.push(lines[i]);
+      }
+      else if ((line.includes('leader') || line.includes('qbft')) && consensusLines.length < 3) {
+        consensusLines.push(lines[i]);
+      }
+      else if (line.includes('relay') && line.includes('timeout') && relayLines.length < 3) {
+        relayLines.push(lines[i]);
+      }
+    }
+    
+    // Build minimal prompt
+    if (errorLines.length > 0) {
+      criticalContent += 'ERRORS:\n' + errorLines.join('\n') + '\n\n';
+    }
+    if (consensusLines.length > 0) {
+      criticalContent += 'CONSENSUS:\n' + consensusLines.join('\n') + '\n\n';
+    }
+    if (relayLines.length > 0) {
+      criticalContent += 'RELAYS:\n' + relayLines.join('\n') + '\n\n';
+    }
+    
+    criticalContent += 'Provide brief analysis: 1. Critical Issues 2. Consensus Status 3. Quick Recommendations (under 500 words)';
+
+    // 7-second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 800,
+          messages: [{
+            role: 'user',
+            content: criticalContent
+          }]
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return {
+          statusCode: response.status,
+          headers,
+          body: JSON.stringify({ 
+            error: `AI analysis unavailable. Use Enhanced Local Analysis for detailed results.` 
+          }),
+        };
+      }
+
+      const data = await response.json();
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          analysis: data.content[0].text + '\n\n---\n*Ultra-Fast AI Analysis*',
+          usage: data.usage,
+          timestamp: new Date().toISOString()
+        }),
+      };
+
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError.name === 'AbortError') {
+        return {
+          statusCode: 504,
+          headers,
+          body: JSON.stringify({ 
+            error: 'AI analysis timeout. Enhanced Local Analysis provides better results!' 
+          }),
+        };
+      }
+      
+      throw fetchError;
+    }
+
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: `AI analysis failed. Enhanced Local Analysis is recommended.`,
+        timestamp: new Date().toISOString()
+      }),
+    };
+  }
+};
