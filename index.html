@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DVT Log Analyzer - Obol Network</title>
+    <title>Enhanced DVT Log Analyzer - Obol Network</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -15,36 +15,143 @@
             background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #312e81 100%);
             min-height: 100vh;
         }
+        .chat-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(100, 255, 218, 0.3) transparent;
+        }
+        .chat-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .chat-scroll::-webkit-scrollbar-thumb {
+            background-color: rgba(100, 255, 218, 0.3);
+            border-radius: 3px;
+        }
+        .typing-animation {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        .message-animation {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
     <div id="root">
         <div style="padding: 2rem; text-align: center; color: white;">
-            <h1>DVT Log Analyzer</h1>
+            <h1>Enhanced DVT Log Analyzer</h1>
             <p>Loading...</p>
         </div>
     </div>
     
     <script type="text/babel">
-        const { useState, useRef } = React;
+        const { useState, useRef, useEffect } = React;
         
-        const DVTLogAnalyzer = () => {
+        const EnhancedDVTLogAnalyzer = () => {
             const [files, setFiles] = useState([]);
-            const [analysis, setAnalysis] = useState(null);
-            const [loading, setLoading] = useState(false);
-            const [useAI, setUseAI] = useState(false);
-            const fileInputRef = useRef(null);
+            const [messages, setMessages] = useState([
+                {
+                    id: 1,
+                    type: 'assistant',
+                    content: `Welcome to the Enhanced DVT Log Analyzer! 🚀
 
-            const handleFileUpload = (event) => {
+I'm your AI assistant specialized in Obol Network DVT analysis. Here's what I can help you with:
+
+**📁 Upload & Analyze:** Drop your DVT log files and I'll provide comprehensive analysis
+**🔍 Interactive Queries:** Ask specific questions about your logs:
+  • "Show me all Charon errors in the last hour"
+  • "Analyze consensus failures in my cluster"
+  • "What MEV-Boost issues do you see?"
+  • "Check cluster health status"
+
+**📚 Obol Documentation:** Get contextual links to relevant Obol docs
+**⚡ Real-time Analysis:** Chat with your logs for instant insights
+
+Upload your files and start asking questions!`,
+                    timestamp: new Date()
+                }
+            ]);
+            
+            const [inputMessage, setInputMessage] = useState('');
+            const [isTyping, setIsTyping] = useState(false);
+            const [logData, setLogData] = useState({});
+            const [analysisMode, setAnalysisMode] = useState('interactive'); // 'interactive' or 'bulk'
+            
+            const chatEndRef = useRef(null);
+            const fileInputRef = useRef(null);
+            const textareaRef = useRef(null);
+
+            useEffect(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [messages]);
+
+            useEffect(() => {
+                const textarea = textareaRef.current;
+                if (textarea) {
+                    textarea.style.height = 'auto';
+                    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+                }
+            }, [inputMessage]);
+
+            const handleFileUpload = async (event) => {
                 const uploadedFiles = Array.from(event.target.files);
-                const processedFiles = uploadedFiles.map(file => ({
-                    id: Math.random().toString(36).substr(2, 9),
-                    name: file.name,
-                    size: file.size,
-                    type: getFileType(file.name),
-                    file: file
-                }));
+                const processedFiles = [];
+                const newLogData = { ...logData };
+
+                for (const file of uploadedFiles) {
+                    const content = await readFileContent(file);
+                    const fileInfo = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        name: file.name,
+                        size: file.size,
+                        type: getFileType(file.name),
+                        file: file,
+                        uploadTime: new Date()
+                    };
+                    
+                    processedFiles.push(fileInfo);
+                    newLogData[file.name] = {
+                        content,
+                        lines: content.split('\n'),
+                        analysis: analyzeFileStructure(content, file.name)
+                    };
+                }
+
                 setFiles(prev => [...prev, ...processedFiles]);
+                setLogData(newLogData);
+
+                // Add confirmation message
+                addMessage('assistant', `✅ **Files Uploaded Successfully!**
+
+Processed ${processedFiles.length} files:
+${processedFiles.map(f => `• **${f.name}** (${f.type}) - ${formatFileSize(f.size)}`).join('\n')}
+
+**Quick Analysis Available:**
+${Object.values(newLogData).map(data => {
+    const stats = data.analysis;
+    return `• ${stats.totalLines.toLocaleString()} lines, ${stats.errors} errors, ${stats.warnings} warnings`;
+}).join('\n')}
+
+**Try asking:** 
+"Show me a summary of all errors" or "What consensus issues do you see?"`, false);
+            };
+
+            const readFileContent = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = e => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsText(file);
+                });
             };
 
             const getFileType = (filename) => {
@@ -57,6 +164,51 @@
                 return 'other';
             };
 
+            const analyzeFileStructure = (content, filename) => {
+                const lines = content.split('\n');
+                const analysis = {
+                    totalLines: lines.length,
+                    errors: 0,
+                    warnings: 0,
+                    timestamps: [],
+                    modules: new Set(),
+                    consensusEvents: [],
+                    charonEvents: [],
+                    mevEvents: [],
+                    criticalIssues: []
+                };
+
+                lines.forEach((line, index) => {
+                    const lowerLine = line.toLowerCase();
+                    
+                    // Count errors and warnings
+                    if (lowerLine.includes('error') || lowerLine.includes('fatal')) {
+                        analysis.errors++;
+                        if (lowerLine.includes('critical') || lowerLine.includes('fatal')) {
+                            analysis.criticalIssues.push({ line: index + 1, content: line.trim() });
+                        }
+                    }
+                    if (lowerLine.includes('warn')) analysis.warnings++;
+                    
+                    // Extract timestamps
+                    const timeMatch = line.match(/\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}/);
+                    if (timeMatch) analysis.timestamps.push({ line: index + 1, timestamp: timeMatch[0] });
+                    
+                    // DVT-specific events
+                    if (lowerLine.includes('consensus') || lowerLine.includes('qbft') || lowerLine.includes('leader')) {
+                        analysis.consensusEvents.push({ line: index + 1, content: line.trim() });
+                    }
+                    if (lowerLine.includes('charon')) {
+                        analysis.charonEvents.push({ line: index + 1, content: line.trim() });
+                    }
+                    if (lowerLine.includes('mev') || lowerLine.includes('relay')) {
+                        analysis.mevEvents.push({ line: index + 1, content: line.trim() });
+                    }
+                });
+
+                return analysis;
+            };
+
             const formatFileSize = (bytes) => {
                 if (bytes === 0) return '0 Bytes';
                 const k = 1024;
@@ -65,331 +217,467 @@
                 return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
             };
 
-            const readFileContent = async (file) => {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = e => resolve(e.target.result);
-                    reader.onerror = reject;
-                    reader.readAsText(file);
-                });
+            const addMessage = (type, content, showTyping = true) => {
+                if (showTyping && type === 'assistant') {
+                    setIsTyping(true);
+                    setTimeout(() => {
+                        setMessages(prev => [...prev, {
+                            id: Date.now(),
+                            type,
+                            content,
+                            timestamp: new Date()
+                        }]);
+                        setIsTyping(false);
+                    }, 1000 + Math.random() * 1500);
+                } else {
+                    setMessages(prev => [...prev, {
+                        id: Date.now(),
+                        type,
+                        content,
+                        timestamp: new Date()
+                    }]);
+                }
             };
 
-            // Enhanced Local Analysis with Obol Documentation (Simplified)
-            const analyzeLogsLocally = async (filesWithContent) => {
-                let report = "# DVT Log Analysis Report (Obol Network Integration)\n\n";
+            const processUserQuery = async (query) => {
+                if (Object.keys(logData).length === 0) {
+                    return "Please upload some DVT log files first so I can analyze them for you! 📁";
+                }
+
+                const lowerQuery = query.toLowerCase();
                 
-                let errorCount = 0;
-                let warningCount = 0;
-                let criticalErrors = [];
-                let totalLines = 0;
-                let consensusEvents = [];
-                let relayIssues = [];
-                let charonIssues = [];
-                let timestamps = [];
-                
-                // Process files
-                for (const file of filesWithContent) {
-                    const lines = file.content.split('\n');
-                    totalLines += lines.length;
-                    
-                    report += `### ${file.name} (${file.type.toUpperCase()})\n`;
-                    report += `- Lines: ${lines.length.toLocaleString()}\n`;
-                    report += `- Size: ${(file.content.length / 1024).toFixed(1)}KB\n\n`;
-                    
-                    for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i];
-                        const lowerLine = line.toLowerCase();
-                        
-                        // Extract timestamps
-                        const timeMatch = line.match(/\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}/);
-                        if (timeMatch) timestamps.push(timeMatch[0]);
-                        
-                        // Count errors
-                        if (lowerLine.includes('error')) {
-                            errorCount++;
-                            if (lowerLine.includes('critical') || lowerLine.includes('fatal')) {
-                                criticalErrors.push({
-                                    file: file.name,
-                                    line: i + 1,
-                                    content: line.trim()
-                                });
-                            }
-                        }
-                        
-                        if (lowerLine.includes('warn')) warningCount++;
-                        
-                        // Charon issues
-                        if (lowerLine.includes('charon') && (lowerLine.includes('error') || lowerLine.includes('warn'))) {
-                            charonIssues.push({
-                                file: file.name,
-                                content: line.trim()
+                // Smart query processing based on keywords
+                if (lowerQuery.includes('error') || lowerQuery.includes('issue')) {
+                    return analyzeErrors(query);
+                } else if (lowerQuery.includes('consensus') || lowerQuery.includes('qbft')) {
+                    return analyzeConsensus(query);
+                } else if (lowerQuery.includes('charon')) {
+                    return analyzeCharon(query);
+                } else if (lowerQuery.includes('mev') || lowerQuery.includes('relay')) {
+                    return analyzeMEV(query);
+                } else if (lowerQuery.includes('summary') || lowerQuery.includes('overview')) {
+                    return generateSummary(query);
+                } else if (lowerQuery.includes('timeline') || lowerQuery.includes('time')) {
+                    return analyzeTimeline(query);
+                } else if (lowerQuery.includes('performance') || lowerQuery.includes('slow')) {
+                    return analyzePerformance(query);
+                } else if (lowerQuery.includes('search') || lowerQuery.includes('find')) {
+                    return searchLogs(query);
+                } else if (lowerQuery.includes('health') || lowerQuery.includes('status')) {
+                    return generateHealthReport(query);
+                } else {
+                    return handleGeneralQuery(query);
+                }
+            };
+
+            const analyzeErrors = (query) => {
+                let response = "## 🚨 Error Analysis\n\n";
+                let totalErrors = 0;
+                let criticalCount = 0;
+
+                Object.entries(logData).forEach(([filename, data]) => {
+                    const analysis = data.analysis;
+                    totalErrors += analysis.errors;
+                    criticalCount += analysis.criticalIssues.length;
+
+                    if (analysis.errors > 0) {
+                        response += `### 📁 ${filename}\n`;
+                        response += `- **Errors:** ${analysis.errors}\n`;
+                        response += `- **Critical Issues:** ${analysis.criticalIssues.length}\n\n`;
+
+                        if (analysis.criticalIssues.length > 0) {
+                            response += "**Critical Issues:**\n";
+                            analysis.criticalIssues.slice(0, 3).forEach((issue, i) => {
+                                response += `${i + 1}. Line ${issue.line}: ${issue.content.substring(0, 100)}...\n`;
                             });
-                        }
-                        
-                        // Consensus events
-                        if (lowerLine.includes('consensus') || lowerLine.includes('qbft') || lowerLine.includes('leader')) {
-                            consensusEvents.push({
-                                file: file.name,
-                                content: line.trim()
-                            });
-                        }
-                        
-                        // Relay issues
-                        if ((lowerLine.includes('relay') || lowerLine.includes('mev')) && 
-                            (lowerLine.includes('error') || lowerLine.includes('timeout'))) {
-                            relayIssues.push({
-                                file: file.name,
-                                content: line.trim()
-                            });
+                            response += "\n";
                         }
                     }
-                }
-                
-                // Build report with Obol documentation
-                report += `## 📊 DVT Cluster Analysis\n`;
-                report += `- **Analysis Date**: ${new Date().toLocaleString()}\n`;
-                report += `- **Files Processed**: ${filesWithContent.length}\n`;
-                report += `- **Total Lines**: ${totalLines.toLocaleString()}\n`;
-                report += `- **Critical Issues**: ${criticalErrors.length}\n`;
-                report += `- **Errors**: ${errorCount}\n`;
-                report += `- **Warnings**: ${warningCount}\n\n`;
-                
-                // Health Score
-                const healthScore = Math.max(0, 100 - (criticalErrors.length * 20) - (errorCount * 2) - warningCount);
-                report += `### 🏥 DVT Health Score: ${healthScore}/100\n`;
-                if (healthScore >= 80) report += `✅ **Excellent** - Cluster healthy\n`;
-                else if (healthScore >= 60) report += `⚠️ **Good** - Minor issues\n`;
-                else if (healthScore >= 40) report += `🟠 **Warning** - Needs attention\n`;
-                else report += `🔴 **Critical** - Immediate action required\n\n`;
-                
-                // Obol Documentation
-                report += `📚 **Obol Network**: [docs.obol.org](https://docs.obol.org)\n\n`;
-                
-                // Critical Issues
-                if (criticalErrors.length > 0) {
-                    report += `## 🚨 CRITICAL ISSUES (${criticalErrors.length})\n`;
-                    criticalErrors.slice(0, 5).forEach((error, i) => {
-                        report += `${i + 1}. **${error.file}:${error.line}**\n`;
-                        report += `   ${error.content.substring(0, 100)}...\n\n`;
-                    });
-                    report += `📖 **Help**: [Troubleshooting Guide](https://docs.obol.org/docs/advanced/troubleshooting)\n\n`;
-                }
-                
-                // Charon Analysis
-                if (charonIssues.length > 0) {
-                    report += `## 🔗 Charon Issues (${charonIssues.length})\n`;
-                    charonIssues.slice(0, 3).forEach((issue, i) => {
-                        report += `${i + 1}. ${issue.content.substring(0, 80)}...\n`;
-                    });
-                    report += `📖 **Charon Guide**: [docs.obol.org/docs/charon/intro](https://docs.obol.org/docs/charon/intro)\n\n`;
-                } else if (filesWithContent.some(f => f.type === 'charon')) {
-                    report += `## 🔗 Charon Status\n`;
-                    report += `✅ **No Charon issues detected**\n\n`;
-                }
-                
-                // Consensus Analysis
-                if (consensusEvents.length > 0) {
-                    report += `## 🤝 Consensus Activity (${consensusEvents.length} events)\n`;
-                    report += `✅ **DVT consensus active**\n`;
-                    report += `📖 **Learn More**: [docs.obol.org/docs/learn/intro](https://docs.obol.org/docs/learn/intro)\n\n`;
-                } else {
-                    report += `## 🤝 Consensus Status\n`;
-                    report += `⚠️ **No consensus events detected**\n`;
-                    report += `📖 **Setup Guide**: [docs.obol.org/docs/int/quickstart/create-cluster](https://docs.obol.org/docs/int/quickstart/create-cluster)\n\n`;
-                }
-                
-                // MEV Relay Analysis
-                if (relayIssues.length > 0) {
-                    report += `## 📡 MEV Relay Issues (${relayIssues.length})\n`;
-                    relayIssues.slice(0, 3).forEach((issue, i) => {
-                        report += `${i + 1}. ${issue.content.substring(0, 80)}...\n`;
-                    });
-                    report += `📖 **MEV Guide**: [docs.obol.org/docs/advanced/mev-boost](https://docs.obol.org/docs/advanced/mev-boost)\n\n`;
-                } else {
-                    report += `## 📡 MEV Relay Status\n`;
-                    report += `✅ **No relay issues detected**\n\n`;
-                }
-                
-                // Recommendations
-                report += `## 🎯 Recommendations\n\n`;
-                
-                if (criticalErrors.length > 0) {
-                    report += `### 🚨 Immediate Actions:\n`;
-                    report += `1. Address ${criticalErrors.length} critical errors\n`;
-                    report += `2. Check DVT cluster connectivity\n`;
-                    report += `3. Verify Charon configuration\n\n`;
-                }
-                
-                report += `### 📊 Obol Resources:\n`;
-                report += `- **Quick Start**: [docs.obol.org/docs/start/quickstart_group](https://docs.obol.org/docs/start/quickstart_group)\n`;
-                report += `- **Troubleshooting**: [docs.obol.org/docs/advanced/troubleshooting](https://docs.obol.org/docs/advanced/troubleshooting)\n`;
-                report += `- **Monitoring**: [docs.obol.org/docs/advanced/monitoring](https://docs.obol.org/docs/advanced/monitoring)\n`;
-                report += `- **Performance**: [docs.obol.org/docs/advanced/performance-tuning](https://docs.obol.org/docs/advanced/performance-tuning)\n\n`;
-                
-                report += `---\n`;
-                report += `*DVT Analysis with Obol Network Integration*\n`;
-                report += `*Processed ${totalLines.toLocaleString()} lines • Powered by docs.obol.org*`;
-                
-                return report;
-            };
-
-            const analyzeWithClaude = async (filesWithContent) => {
-                const prompt = `Analyze these DVT logs with Obol Network context:
-
-Files: ${filesWithContent.map(f => f.name + " (" + f.type + ")").join(", ")}
-
-Focus on: DVT consensus, Charon issues, MEV relays, cluster health.
-Include Obol documentation links from docs.obol.org.
-
-Sample logs:
-${filesWithContent.map(f => f.name + ":\n" + f.content.slice(0, 2000)).join("\n\n")}`;
-
-                const response = await fetch('/api/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt })
                 });
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'AI analysis failed');
+                if (totalErrors === 0) {
+                    response += "✅ **Great news!** No errors detected in your DVT logs.\n\n";
+                } else {
+                    response += `**Total Errors:** ${totalErrors} (${criticalCount} critical)\n\n`;
                 }
 
-                const data = await response.json();
-                return data.success ? data.analysis : 'Analysis failed';
+                response += "📚 **Obol Resources:**\n";
+                response += "- [Troubleshooting Guide](https://docs.obol.org/docs/advanced/troubleshooting)\n";
+                response += "- [Common Issues](https://docs.obol.org/docs/advanced/troubleshooting)\n";
+
+                return response;
             };
 
-            const analyze = async () => {
-                if (files.length === 0) {
-                    alert('Please upload log files first');
-                    return;
+            const analyzeConsensus = (query) => {
+                let response = "## 🤝 DVT Consensus Analysis\n\n";
+                let totalConsensusEvents = 0;
+
+                Object.entries(logData).forEach(([filename, data]) => {
+                    const events = data.analysis.consensusEvents;
+                    totalConsensusEvents += events.length;
+
+                    if (events.length > 0) {
+                        response += `### 📁 ${filename}\n`;
+                        response += `- **Consensus Events:** ${events.length}\n`;
+                        
+                        const recentEvents = events.slice(-5);
+                        response += "\n**Recent Events:**\n";
+                        recentEvents.forEach((event, i) => {
+                            response += `${i + 1}. Line ${event.line}: ${event.content.substring(0, 80)}...\n`;
+                        });
+                        response += "\n";
+                    }
+                });
+
+                if (totalConsensusEvents === 0) {
+                    response += "⚠️ **No consensus events detected.** This might indicate:\n";
+                    response += "- DVT cluster not properly formed\n";
+                    response += "- Charon middleware not running\n";
+                    response += "- Configuration issues\n\n";
+                    response += "📖 **Setup Guide:** [Create DVT Cluster](https://docs.obol.org/docs/int/quickstart/create-cluster)\n";
+                } else {
+                    response += `✅ **Consensus Active:** ${totalConsensusEvents} events detected\n\n`;
+                    response += "📚 **Learn More:** [DVT Consensus](https://docs.obol.org/docs/learn/intro)\n";
                 }
 
-                setLoading(true);
-                
-                try {
-                    const filesWithContent = await Promise.all(
-                        files.map(async (f) => ({
-                            ...f,
-                            content: await readFileContent(f.file)
-                        }))
-                    );
+                return response;
+            };
 
-                    let result;
-                    if (useAI) {
-                        result = await analyzeWithClaude(filesWithContent);
+            const analyzeCharon = (query) => {
+                let response = "## 🔗 Charon Middleware Analysis\n\n";
+                let charonEvents = 0;
+
+                Object.entries(logData).forEach(([filename, data]) => {
+                    const events = data.analysis.charonEvents;
+                    charonEvents += events.length;
+
+                    if (events.length > 0) {
+                        response += `### 📁 ${filename}\n`;
+                        response += `- **Charon Events:** ${events.length}\n`;
+                        
+                        // Look for specific Charon patterns
+                        const errors = events.filter(e => e.content.toLowerCase().includes('error'));
+                        const warnings = events.filter(e => e.content.toLowerCase().includes('warn'));
+                        
+                        if (errors.length > 0) {
+                            response += `- **Charon Errors:** ${errors.length}\n`;
+                        }
+                        if (warnings.length > 0) {
+                            response += `- **Charon Warnings:** ${warnings.length}\n`;
+                        }
+                        response += "\n";
+                    }
+                });
+
+                response += "📚 **Charon Resources:**\n";
+                response += "- [Charon Documentation](https://docs.obol.org/docs/charon/intro)\n";
+                response += "- [Docker Configuration](https://docs.obol.org/docs/charon/run/docker)\n";
+                response += "- [Troubleshooting Charon](https://docs.obol.org/docs/advanced/troubleshooting)\n";
+
+                return response;
+            };
+
+            const analyzeMEV = (query) => {
+                let response = "## 📡 MEV-Boost Analysis\n\n";
+                let mevEvents = 0;
+
+                Object.entries(logData).forEach(([filename, data]) => {
+                    const events = data.analysis.mevEvents;
+                    mevEvents += events.length;
+
+                    if (events.length > 0) {
+                        response += `### 📁 ${filename}\n`;
+                        response += `- **MEV Events:** ${events.length}\n`;
+                        
+                        const recentEvents = events.slice(-3);
+                        response += "\n**Recent MEV Activity:**\n";
+                        recentEvents.forEach((event, i) => {
+                            response += `${i + 1}. Line ${event.line}: ${event.content.substring(0, 80)}...\n`;
+                        });
+                        response += "\n";
+                    }
+                });
+
+                response += "📚 **MEV Resources:**\n";
+                response += "- [MEV-Boost with DVT](https://docs.obol.org/docs/advanced/mev-boost)\n";
+                response += "- [Relay Configuration](https://docs.obol.org/docs/advanced/mev-boost)\n";
+
+                return response;
+            };
+
+            const generateSummary = (query) => {
+                let response = "## 📊 DVT Cluster Summary\n\n";
+                
+                const stats = {
+                    totalFiles: Object.keys(logData).length,
+                    totalLines: 0,
+                    totalErrors: 0,
+                    totalWarnings: 0,
+                    consensusEvents: 0,
+                    charonEvents: 0,
+                    mevEvents: 0
+                };
+
+                Object.values(logData).forEach(data => {
+                    const analysis = data.analysis;
+                    stats.totalLines += analysis.totalLines;
+                    stats.totalErrors += analysis.errors;
+                    stats.totalWarnings += analysis.warnings;
+                    stats.consensusEvents += analysis.consensusEvents.length;
+                    stats.charonEvents += analysis.charonEvents.length;
+                    stats.mevEvents += analysis.mevEvents.length;
+                });
+
+                // Health Score Calculation
+                const healthScore = Math.max(0, 100 - (stats.totalErrors * 5) - (stats.totalWarnings * 1));
+                
+                response += `### 🏥 DVT Health Score: **${healthScore}/100**\n`;
+                if (healthScore >= 90) response += "✅ **Excellent** - Cluster running smoothly\n";
+                else if (healthScore >= 70) response += "🟡 **Good** - Minor issues detected\n";
+                else if (healthScore >= 50) response += "🟠 **Warning** - Several issues need attention\n";
+                else response += "🔴 **Critical** - Immediate action required\n\n";
+
+                response += "### 📈 Statistics:\n";
+                response += `- **Files Analyzed:** ${stats.totalFiles}\n`;
+                response += `- **Total Log Lines:** ${stats.totalLines.toLocaleString()}\n`;
+                response += `- **Errors:** ${stats.totalErrors}\n`;
+                response += `- **Warnings:** ${stats.totalWarnings}\n`;
+                response += `- **Consensus Events:** ${stats.consensusEvents}\n`;
+                response += `- **Charon Activity:** ${stats.charonEvents}\n`;
+                response += `- **MEV Events:** ${stats.mevEvents}\n\n`;
+
+                response += "### 🎯 Recommendations:\n";
+                if (stats.totalErrors > 10) {
+                    response += "- 🚨 High error count detected - investigate critical issues\n";
+                }
+                if (stats.consensusEvents === 0) {
+                    response += "- ⚠️ No consensus activity - check DVT cluster configuration\n";
+                }
+                if (stats.charonEvents === 0) {
+                    response += "- 🔗 No Charon activity detected - verify middleware is running\n";
+                }
+
+                response += "\n📚 **Quick Links:**\n";
+                response += "- [Monitoring Guide](https://docs.obol.org/docs/advanced/monitoring)\n";
+                response += "- [Health Checks](https://docs.obol.org/docs/advanced/monitoring)\n";
+
+                return response;
+            };
+
+            const generateHealthReport = (query) => {
+                return generateSummary(query);
+            };
+
+            const analyzeTimeline = (query) => {
+                let response = "## ⏱️ Timeline Analysis\n\n";
+                
+                const allTimestamps = [];
+                Object.entries(logData).forEach(([filename, data]) => {
+                    data.analysis.timestamps.forEach(ts => {
+                        allTimestamps.push({
+                            filename,
+                            ...ts
+                        });
+                    });
+                });
+
+                if (allTimestamps.length === 0) {
+                    response += "❌ No timestamps found in the log files.\n";
+                    return response;
+                }
+
+                allTimestamps.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                
+                const earliest = allTimestamps[0];
+                const latest = allTimestamps[allTimestamps.length - 1];
+                
+                response += `### 📅 Time Range:\n`;
+                response += `- **Start:** ${earliest.timestamp} (${earliest.filename})\n`;
+                response += `- **End:** ${latest.timestamp} (${latest.filename})\n`;
+                response += `- **Total Events:** ${allTimestamps.length}\n\n`;
+
+                // Show recent activity
+                response += "### 🕐 Recent Activity (Last 10 events):\n";
+                allTimestamps.slice(-10).forEach((event, i) => {
+                    response += `${i + 1}. ${event.timestamp} - ${event.filename} (Line ${event.line})\n`;
+                });
+
+                return response;
+            };
+
+            const analyzePerformance = (query) => {
+                let response = "## ⚡ Performance Analysis\n\n";
+                
+                response += "Based on log analysis, here are potential performance insights:\n\n";
+                
+                Object.entries(logData).forEach(([filename, data]) => {
+                    const analysis = data.analysis;
+                    response += `### 📁 ${filename}\n`;
+                    
+                    // Calculate events per line ratio
+                    const eventDensity = (analysis.consensusEvents.length + analysis.charonEvents.length) / analysis.totalLines;
+                    
+                    if (eventDensity > 0.1) {
+                        response += "🔥 **High Activity** - Frequent consensus/Charon events\n";
+                    } else if (eventDensity > 0.01) {
+                        response += "⚡ **Moderate Activity** - Normal consensus patterns\n";
                     } else {
-                        result = await analyzeLogsLocally(filesWithContent);
+                        response += "📈 **Low Activity** - Limited consensus events\n";
                     }
+                    
+                    response += `- Event Density: ${(eventDensity * 100).toFixed(2)}%\n`;
+                    response += `- Error Rate: ${((analysis.errors / analysis.totalLines) * 100).toFixed(3)}%\n\n`;
+                });
 
-                    setAnalysis({
-                        timestamp: new Date().toISOString(),
-                        filesAnalyzed: files.length,
-                        result: result,
-                        method: useAI ? 'Claude AI (Obol)' : 'Local Analysis (Obol)'
+                response += "📚 **Performance Resources:**\n";
+                response += "- [Performance Tuning](https://docs.obol.org/docs/advanced/performance-tuning)\n";
+                response += "- [Monitoring](https://docs.obol.org/docs/advanced/monitoring)\n";
+
+                return response;
+            };
+
+            const searchLogs = (query) => {
+                const searchTerm = query.replace(/search|find|look for/gi, '').trim();
+                if (!searchTerm) {
+                    return "Please specify what you'd like to search for. Example: 'search for timeout errors'";
+                }
+
+                let response = `## 🔍 Search Results for: "${searchTerm}"\n\n`;
+                let totalMatches = 0;
+
+                Object.entries(logData).forEach(([filename, data]) => {
+                    const matches = [];
+                    data.lines.forEach((line, index) => {
+                        if (line.toLowerCase().includes(searchTerm.toLowerCase())) {
+                            matches.push({ line: index + 1, content: line.trim() });
+                        }
                     });
 
+                    if (matches.length > 0) {
+                        totalMatches += matches.length;
+                        response += `### 📁 ${filename} (${matches.length} matches)\n`;
+                        matches.slice(0, 5).forEach((match, i) => {
+                            response += `${i + 1}. Line ${match.line}: ${match.content.substring(0, 100)}...\n`;
+                        });
+                        if (matches.length > 5) {
+                            response += `... and ${matches.length - 5} more matches\n`;
+                        }
+                        response += "\n";
+                    }
+                });
+
+                if (totalMatches === 0) {
+                    response += `❌ No matches found for "${searchTerm}"\n`;
+                    response += "\n**Try searching for:**\n";
+                    response += "- error, warning, timeout\n";
+                    response += "- consensus, qbft, leader\n";
+                    response += "- charon, relay, mev\n";
+                } else {
+                    response += `✅ **Total matches:** ${totalMatches}\n`;
+                }
+
+                return response;
+            };
+
+            const handleGeneralQuery = (query) => {
+                const suggestions = [
+                    "Show me all errors",
+                    "Analyze consensus activity", 
+                    "Check Charon status",
+                    "Generate summary report",
+                    "Search for timeout issues",
+                    "What's my cluster health?",
+                    "Show timeline of events"
+                ];
+
+                return `I understand you're asking: "${query}"
+
+While I can provide general DVT guidance, I work best with specific commands. Here are some things you can try:
+
+**🔍 Popular Commands:**
+${suggestions.map(s => `• "${s}"`).join('\n')}
+
+**📚 Or ask about:**
+• Specific error messages or patterns
+• DVT consensus behavior  
+• Charon middleware issues
+• MEV-Boost integration
+• Performance concerns
+• Configuration problems
+
+**📖 Obol Documentation:** [docs.obol.org](https://docs.obol.org)
+
+What would you like to explore first?`;
+            };
+
+            const handleSendMessage = async () => {
+                if (!inputMessage.trim()) return;
+
+                const userMessage = inputMessage.trim();
+                setInputMessage('');
+
+                // Add user message
+                addMessage('user', userMessage, false);
+
+                // Process query and respond
+                try {
+                    const response = await processUserQuery(userMessage);
+                    addMessage('assistant', response);
                 } catch (error) {
-                    alert('Analysis failed: ' + error.message);
-                } finally {
-                    setLoading(false);
+                    addMessage('assistant', `❌ Sorry, I encountered an error processing your request: ${error.message}\n\nPlease try rephrasing your question or check that your log files are properly uploaded.`);
                 }
             };
 
-            const downloadReport = () => {
-                if (!analysis) return;
-                
-                const report = analysis.result + "\n\n---\nGenerated: " + new Date(analysis.timestamp).toLocaleString() + "\nMethod: " + analysis.method;
-                const blob = new Blob([report], { type: 'text/markdown' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'dvt-obol-analysis-' + new Date().toISOString().split('T')[0] + '.md';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                }
+            };
+
+            const quickCommand = (command) => {
+                setInputMessage(command);
+                setTimeout(() => handleSendMessage(), 100);
+            };
+
+            const removeFile = (fileId) => {
+                const file = files.find(f => f.id === fileId);
+                if (file) {
+                    setFiles(files.filter(f => f.id !== fileId));
+                    const newLogData = { ...logData };
+                    delete newLogData[file.name];
+                    setLogData(newLogData);
+                    
+                    addMessage('assistant', `🗑️ Removed **${file.name}** from analysis.`, false);
+                }
             };
 
             return (
                 <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
-                    <div className="container mx-auto px-4 py-8">
-                        {/* Header with Obol Branding */}
-                        <div className="text-center mb-12">
-                            <h1 className="text-4xl font-bold text-white mb-4">DVT Log Analyzer</h1>
-                            <p className="text-gray-300 text-lg mb-4">
-                                Enhanced with Obol Network Documentation
-                            </p>
+                    <div className="container mx-auto px-4 py-6">
+                        {/* Header */}
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-white mb-2">Enhanced DVT Log Analyzer</h1>
+                            <p className="text-gray-300 mb-4">Interactive AI Assistant with Obol Network Integration</p>
                             <div className="inline-block bg-green-500/20 text-green-300 px-4 py-2 rounded-full text-sm">
-                                📚 Powered by docs.obol.org • 🔗 Charon Integration • 🤝 DVT Consensus
+                                🤖 AI-Powered • 📚 Obol Docs • 🔍 Interactive Analysis
                             </div>
                         </div>
 
-                        <div className="grid lg:grid-cols-2 gap-8">
-                            {/* Left Column */}
-                            <div className="space-y-6">
-                                {/* Analysis Method */}
-                                <div className="bg-white/10 rounded-xl p-6 border border-white/20">
-                                    <h2 className="text-xl font-bold text-white mb-4">Analysis Method</h2>
-                                    
-                                    <div className="space-y-3">
-                                        <label className="flex items-center gap-3 text-white cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                checked={!useAI}
-                                                onChange={() => setUseAI(false)}
-                                            />
-                                            Enhanced Local Analysis (Recommended)
-                                        </label>
-                                        <p className="text-gray-400 text-sm ml-6">
-                                            🏥 DVT health scoring • 📚 Obol documentation links • ⚡ Instant results
-                                        </p>
-                                        
-                                        <label className="flex items-center gap-3 text-white cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                checked={useAI}
-                                                onChange={() => setUseAI(true)}
-                                            />
-                                            Claude AI Analysis (Obol-Enhanced)
-                                        </label>
-                                        <p className="text-gray-400 text-sm ml-6">
-                                            🤖 AI insights • 📖 Obol context • 🚀 Quick analysis
-                                        </p>
-                                    </div>
-
-                                    {/* Obol Network Info */}
-                                    <div className="mt-4 bg-blue-900/30 rounded-lg p-4 border border-blue-500/30">
-                                        <h4 className="text-blue-200 font-medium mb-2">🔗 Obol Network Integration</h4>
-                                        <p className="text-blue-300 text-sm mb-2">
-                                            This analyzer includes specific guidance for:
-                                        </p>
-                                        <ul className="text-blue-300 text-sm space-y-1">
-                                            <li>• Charon middleware troubleshooting</li>
-                                            <li>• DVT consensus analysis</li>
-                                            <li>• Cluster health monitoring</li>
-                                            <li>• MEV-Boost integration</li>
-                                        </ul>
-                                        <a href="https://docs.obol.org" target="_blank" rel="noopener" 
-                                           className="inline-block mt-2 text-blue-200 hover:text-blue-100 text-sm underline">
-                                            📚 View Obol Documentation →
-                                        </a>
-                                    </div>
-                                </div>
-
+                        <div className="grid lg:grid-cols-3 gap-6">
+                            {/* Left Sidebar - File Management */}
+                            <div className="lg:col-span-1 space-y-6">
                                 {/* File Upload */}
                                 <div className="bg-white/10 rounded-xl p-6 border border-white/20">
-                                    <h2 className="text-xl font-bold text-white mb-4">Upload DVT Log Files</h2>
+                                    <h2 className="text-lg font-bold text-white mb-4">📁 Upload DVT Logs</h2>
                                     
                                     <div 
-                                        className="border-2 border-dashed border-white/30 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                                        className="border-2 border-dashed border-white/30 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer"
                                         onClick={() => fileInputRef.current?.click()}
                                     >
-                                        <div className="text-4xl mb-4">📄</div>
-                                        <p className="text-white font-medium mb-2">Click to upload DVT log files</p>
-                                        <p className="text-gray-400 text-sm">
-                                            Charon, Lighthouse, MEV-boost, Beacon node logs
-                                        </p>
+                                        <div className="text-3xl mb-2">📄</div>
+                                        <p className="text-white font-medium mb-1">Click to upload</p>
+                                        <p className="text-gray-400 text-sm">DVT, Charon, Beacon logs</p>
                                         <input
                                             ref={fileInputRef}
                                             type="file"
@@ -399,48 +687,26 @@ ${filesWithContent.map(f => f.name + ":\n" + f.content.slice(0, 2000)).join("\n\
                                             style={{ display: 'none' }}
                                         />
                                     </div>
-
-                                    {/* File Type Legend */}
-                                    <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-3 h-3 bg-purple-500 rounded"></span>
-                                            <span className="text-gray-300">Charon (DVT)</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-3 h-3 bg-blue-500 rounded"></span>
-                                            <span className="text-gray-300">Lighthouse</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-3 h-3 bg-green-500 rounded"></span>
-                                            <span className="text-gray-300">MEV-boost</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-3 h-3 bg-orange-500 rounded"></span>
-                                            <span className="text-gray-300">Beacon Node</span>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 {/* Uploaded Files */}
                                 {files.length > 0 && (
-                                    <div className="bg-white/10 rounded-xl p-6 border border-white/20">
-                                        <h3 className="text-xl font-bold text-white mb-4">
-                                            Uploaded Files ({files.length})
-                                        </h3>
-                                        <div className="space-y-3 max-h-60 overflow-y-auto">
+                                    <div className="bg-white/10 rounded-xl p-4 border border-white/20">
+                                        <h3 className="text-white font-medium mb-3">Files ({files.length})</h3>
+                                        <div className="space-y-2 max-h-60 overflow-y-auto chat-scroll">
                                             {files.map(file => (
                                                 <div key={file.id} className="bg-white/5 rounded-lg p-3 flex items-center justify-between">
-                                                    <div>
-                                                        <p className="text-white font-medium">{file.name}</p>
-                                                        <p className="text-gray-400 text-sm">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-white font-medium text-sm truncate">{file.name}</p>
+                                                        <p className="text-gray-400 text-xs">
                                                             {formatFileSize(file.size)} • {file.type}
                                                         </p>
                                                     </div>
                                                     <button 
-                                                        onClick={() => setFiles(files.filter(f => f.id !== file.id))}
-                                                        className="text-red-400 hover:text-red-300 text-sm"
+                                                        onClick={() => removeFile(file.id)}
+                                                        className="text-red-400 hover:text-red-300 text-sm ml-2 px-2 py-1 rounded hover:bg-red-500/10"
                                                     >
-                                                        🗑️
+                                                        ×
                                                     </button>
                                                 </div>
                                             ))}
@@ -448,98 +714,216 @@ ${filesWithContent.map(f => f.name + ":\n" + f.content.slice(0, 2000)).join("\n\
                                     </div>
                                 )}
 
-                                {/* Analyze Button */}
-                                <button
-                                    onClick={analyze}
-                                    disabled={loading || files.length === 0}
-                                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:bg-gray-500 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200"
-                                >
-                                    {loading ? (
-                                        useAI ? '🤖 AI Analysis with Obol Context...' : '⚡ Enhanced Analysis with Obol Docs...'
-                                    ) : (
-                                        useAI ? '🤖 Analyze with Claude AI' : '⚡ Analyze with Obol Integration'
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* Right Column - Results */}
-                            <div className="space-y-6">
-                                <div className="bg-white/10 rounded-xl p-6 border border-white/20">
-                                    <h2 className="text-xl font-bold text-white mb-4">DVT Analysis Results</h2>
-                                    
-                                    {!analysis ? (
-                                        <div className="text-center py-12">
-                                            <div className="text-4xl mb-4">🔗</div>
-                                            <p className="text-gray-400">Upload DVT logs and click analyze</p>
-                                            <p className="text-gray-500 text-sm mt-2">
-                                                Get insights with Obol Network documentation
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-green-400 font-medium">✅ Analysis Complete</span>
-                                                    <span className="text-blue-300 text-sm">({analysis.method})</span>
-                                                </div>
-                                                <button
-                                                    onClick={downloadReport}
-                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
-                                                >
-                                                    💾 Download Report
-                                                </button>
-                                            </div>
-                                            
-                                            <div className="bg-black/30 rounded-lg p-4 max-h-96 overflow-y-auto">
-                                                <pre className="text-gray-300 text-sm whitespace-pre-wrap">
-                                                    {analysis.result}
-                                                </pre>
-                                            </div>
-                                            
-                                            <div className="text-gray-400 text-sm">
-                                                Generated: {new Date(analysis.timestamp).toLocaleString()} | 
-                                                Files: {analysis.filesAnalyzed} | 
-                                                Method: {analysis.method}
-                                            </div>
-                                        </div>
+                                {/* Quick Commands */}
+                                <div className="bg-white/10 rounded-xl p-4 border border-white/20">
+                                    <h3 className="text-white font-medium mb-3">⚡ Quick Commands</h3>
+                                    <div className="space-y-2">
+                                        {[
+                                            "Generate summary report",
+                                            "Show all errors",
+                                            "Analyze consensus activity",
+                                            "Check Charon status", 
+                                            "Find MEV-Boost issues",
+                                            "What's my cluster health?",
+                                            "Show timeline of events"
+                                        ].map((cmd, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => quickCommand(cmd)}
+                                                className="w-full text-left bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-200 px-3 py-2 rounded-lg text-sm transition-colors"
+                                                disabled={files.length === 0}
+                                            >
+                                                {cmd}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {files.length === 0 && (
+                                        <p className="text-gray-400 text-xs mt-2">Upload files to enable commands</p>
                                     )}
                                 </div>
 
-                                {/* Stats */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white/10 rounded-xl p-4 text-center">
-                                        <div className="text-2xl mb-2">📁</div>
-                                        <p className="text-white font-bold text-xl">{files.length}</p>
-                                        <p className="text-gray-400 text-sm">Files</p>
+                                {/* Analysis Stats */}
+                                {files.length > 0 && (
+                                    <div className="bg-white/10 rounded-xl p-4 border border-white/20">
+                                        <h3 className="text-white font-medium mb-3">📊 Quick Stats</h3>
+                                        <div className="space-y-2">
+                                            {Object.entries(logData).map(([filename, data]) => (
+                                                <div key={filename} className="bg-white/5 rounded p-2">
+                                                    <p className="text-white text-sm font-medium truncate">{filename}</p>
+                                                    <div className="grid grid-cols-3 gap-2 mt-1">
+                                                        <div className="text-center">
+                                                            <div className="text-green-400 text-xs">{data.analysis.totalLines.toLocaleString()}</div>
+                                                            <div className="text-gray-400 text-xs">Lines</div>
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <div className="text-red-400 text-xs">{data.analysis.errors}</div>
+                                                            <div className="text-gray-400 text-xs">Errors</div>
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <div className="text-yellow-400 text-xs">{data.analysis.warnings}</div>
+                                                            <div className="text-gray-400 text-xs">Warnings</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="bg-white/10 rounded-xl p-4 text-center">
-                                        <div className="text-2xl mb-2">🔗</div>
-                                        <p className="text-white font-bold text-xl">{analysis ? '✓' : '—'}</p>
-                                        <p className="text-gray-400 text-sm">DVT Status</p>
+                                )}
+                            </div>
+
+                            {/* Main Chat Area */}
+                            <div className="lg:col-span-2">
+                                <div className="bg-white/10 rounded-xl border border-white/20 h-[80vh] flex flex-col">
+                                    {/* Chat Header */}
+                                    <div className="p-4 border-b border-white/10">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h2 className="text-white font-bold">🤖 DVT AI Assistant</h2>
+                                                <p className="text-gray-400 text-sm">Ask me anything about your DVT logs</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                                <span className="text-green-400 text-sm">Online</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Messages Container */}
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-scroll">
+                                        {messages.map((message) => (
+                                            <div key={message.id} className={`message-animation ${
+                                                message.type === 'user' ? 'ml-8' : 'mr-8'
+                                            }`}>
+                                                <div className={`rounded-xl p-4 ${
+                                                    message.type === 'user' 
+                                                        ? 'bg-blue-600 text-white ml-auto' 
+                                                        : 'bg-white/5 border border-white/10 text-gray-100'
+                                                } max-w-full`}>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="font-medium text-sm">
+                                                            {message.type === 'user' ? '👤 You' : '🤖 DVT Assistant'}
+                                                        </span>
+                                                        <span className="text-xs opacity-60">
+                                                            {message.timestamp.toLocaleTimeString()}
+                                                        </span>
+                                                    </div>
+                                                    <div className="prose prose-sm max-w-none">
+                                                        <div dangerouslySetInnerHTML={{
+                                                            __html: message.content
+                                                                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                                .replace(/^##\s(.+)$/gm, '<h3 style="color: #64ffda; margin: 16px 0 8px 0;">$1</h3>')
+                                                                .replace(/^###\s(.+)$/gm, '<h4 style="color: #4fc3f7; margin: 12px 0 6px 0;">$1</h4>')
+                                                                .replace(/^-\s(.+)$/gm, '<li style="margin: 4px 0;">$1</li>')
+                                                                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: #64ffda; text-decoration: underline;">$1</a>')
+                                                                .replace(/\n/g, '<br>')
+                                                        }} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        
+                                        {isTyping && (
+                                            <div className="mr-8">
+                                                <div className="bg-white/5 border border-white/10 rounded-xl p-4 max-w-xs">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium text-sm">🤖 DVT Assistant</span>
+                                                        <span className="text-xs opacity-60">typing</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 mt-2 typing-animation">
+                                                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                                        <div className="w-2 h-2 bg-gray-400 rounded-full animation-delay-200"></div>
+                                                        <div className="w-2 h-2 bg-gray-400 rounded-full animation-delay-400"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div ref={chatEndRef} />
+                                    </div>
+
+                                    {/* Input Area */}
+                                    <div className="p-4 border-t border-white/10">
+                                        <div className="flex gap-2">
+                                            <div className="flex-1 relative">
+                                                <textarea
+                                                    ref={textareaRef}
+                                                    value={inputMessage}
+                                                    onChange={(e) => setInputMessage(e.target.value)}
+                                                    onKeyPress={handleKeyPress}
+                                                    placeholder={files.length > 0 
+                                                        ? "Ask me anything about your DVT logs... (e.g., 'Show me all consensus errors')"
+                                                        : "Upload log files first, then ask me questions..."
+                                                    }
+                                                    disabled={isTyping}
+                                                    className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400 focus:bg-white/10 transition-all"
+                                                    style={{ minHeight: '44px', maxHeight: '120px' }}
+                                                />
+                                                <div className="absolute right-2 bottom-2 text-xs text-gray-500">
+                                                    Press Enter to send
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={handleSendMessage}
+                                                disabled={!inputMessage.trim() || isTyping}
+                                                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center gap-2"
+                                            >
+                                                {isTyping ? (
+                                                    <>
+                                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                        Processing
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        🚀 Send
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                        
+                                        {/* Sample Questions */}
+                                        {files.length > 0 && messages.length <= 2 && (
+                                            <div className="mt-3">
+                                                <p className="text-gray-400 text-xs mb-2">💡 Try asking:</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {[
+                                                        "What errors do you see?",
+                                                        "Analyze my consensus activity",
+                                                        "Check cluster health",
+                                                        "Show timeline analysis"
+                                                    ].map((question, i) => (
+                                                        <button
+                                                            key={i}
+                                                            onClick={() => setInputMessage(question)}
+                                                            className="bg-white/5 hover:bg-white/10 border border-white/20 text-gray-300 px-3 py-1 rounded-lg text-xs transition-colors"
+                                                        >
+                                                            {question}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Footer with Obol Links */}
-                        <div className="mt-12 text-center">
-                            <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-xl p-6 border border-purple-500/30">
-                                <h3 className="text-purple-200 font-medium mb-2">🚀 Powered by Obol Network</h3>
-                                <p className="text-purple-300 text-sm mb-4">
-                                    Enhanced DVT log analysis with integrated documentation
+                        {/* Footer */}
+                        <div className="mt-8 text-center">
+                            <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-xl p-4 border border-purple-500/30">
+                                <p className="text-purple-300 text-sm mb-2">
+                                    🚀 Enhanced with Obol Network Integration • 🤖 AI-Powered Analysis
                                 </p>
-                                <div className="flex justify-center gap-4 text-sm">
+                                <div className="flex justify-center gap-4 text-xs">
                                     <a href="https://docs.obol.org" target="_blank" rel="noopener" 
                                        className="text-purple-200 hover:text-purple-100 underline">
-                                        📚 Documentation
-                                    </a>
-                                    <a href="https://docs.obol.org/docs/start/quickstart_group" target="_blank" rel="noopener" 
-                                       className="text-purple-200 hover:text-purple-100 underline">
-                                        🚀 Quick Start
+                                        📚 Obol Docs
                                     </a>
                                     <a href="https://docs.obol.org/docs/advanced/troubleshooting" target="_blank" rel="noopener" 
                                        className="text-purple-200 hover:text-purple-100 underline">
                                         🔧 Troubleshooting
+                                    </a>
+                                    <a href="https://docs.obol.org/docs/advanced/monitoring" target="_blank" rel="noopener" 
+                                       className="text-purple-200 hover:text-purple-100 underline">
+                                       📊 Monitoring
                                     </a>
                                 </div>
                             </div>
@@ -549,7 +933,7 @@ ${filesWithContent.map(f => f.name + ":\n" + f.content.slice(0, 2000)).join("\n\
             );
         };
 
-        ReactDOM.render(<DVTLogAnalyzer />, document.getElementById('root'));
+        ReactDOM.render(<EnhancedDVTLogAnalyzer />, document.getElementById('root'));
     </script>
 </body>
 </html>
