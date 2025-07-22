@@ -12,12 +12,12 @@
         body { 
             margin: 0; 
             font-family: system-ui, sans-serif; 
-            background: linear-gradient(135deg, #0a0a0b 0%, #1a1a1d 50%, #2d2d32 100%);
+            background: linear-gradient(135deg, #000000 0%, #0f1419 50%, #1a1f2e 100%);
             min-height: 100vh;
         }
         .chat-scroll {
             scrollbar-width: thin;
-            scrollbar-color: rgba(255, 107, 74, 0.3) transparent;
+            scrollbar-color: rgba(0, 255, 136, 0.3) transparent;
         }
         .chat-scroll::-webkit-scrollbar {
             width: 6px;
@@ -26,7 +26,7 @@
             background: transparent;
         }
         .chat-scroll::-webkit-scrollbar-thumb {
-            background-color: rgba(255, 107, 74, 0.3);
+            background-color: rgba(0, 255, 136, 0.3);
             border-radius: 3px;
         }
         .typing-animation {
@@ -244,370 +244,109 @@ ${Object.values(newLogData).map(data => {
                     return "Please upload some DVT log files first so I can analyze them for you! 📁";
                 }
 
-                const lowerQuery = query.toLowerCase();
-                
-                // Smart query processing based on keywords
-                if (lowerQuery.includes('error') || lowerQuery.includes('issue')) {
-                    return analyzeErrors(query);
-                } else if (lowerQuery.includes('consensus') || lowerQuery.includes('qbft')) {
-                    return analyzeConsensus(query);
-                } else if (lowerQuery.includes('charon')) {
-                    return analyzeCharon(query);
-                } else if (lowerQuery.includes('mev') || lowerQuery.includes('relay')) {
-                    return analyzeMEV(query);
-                } else if (lowerQuery.includes('summary') || lowerQuery.includes('overview')) {
-                    return generateSummary(query);
-                } else if (lowerQuery.includes('timeline') || lowerQuery.includes('time')) {
-                    return analyzeTimeline(query);
-                } else if (lowerQuery.includes('performance') || lowerQuery.includes('slow')) {
-                    return analyzePerformance(query);
-                } else if (lowerQuery.includes('search') || lowerQuery.includes('find')) {
-                    return searchLogs(query);
-                } else if (lowerQuery.includes('health') || lowerQuery.includes('status')) {
-                    return generateHealthReport(query);
-                } else {
-                    return handleGeneralQuery(query);
-                }
-            };
+                try {
+                    // Prepare log data for Claude AI
+                    const logSummary = Object.entries(logData).map(([filename, data]) => {
+                        const analysis = data.analysis;
+                        return `**${filename}** (${getFileType(filename)}):
+- Lines: ${analysis.totalLines.toLocaleString()}
+- Errors: ${analysis.errors}
+- Warnings: ${analysis.warnings}
+- Consensus Events: ${analysis.consensusEvents.length}
+- Charon Events: ${analysis.charonEvents.length}
+- MEV Events: ${analysis.mevEvents.length}
 
-            const analyzeErrors = (query) => {
-                let response = "## 🚨 Error Analysis\n\n";
-                let totalErrors = 0;
-                let criticalCount = 0;
+Recent log sample:
+${data.lines.slice(-20).join('\n').substring(0, 1000)}...`;
+                    }).join('\n\n');
 
-                Object.entries(logData).forEach(([filename, data]) => {
-                    const analysis = data.analysis;
-                    totalErrors += analysis.errors;
-                    criticalCount += analysis.criticalIssues.length;
+                    // Create enhanced prompt for Claude
+                    const prompt = `You are an expert Obol Network DVT (Distributed Validator Technology) log analyzer. 
 
-                    if (analysis.errors > 0) {
-                        response += `### 📁 ${filename}\n`;
-                        response += `- **Errors:** ${analysis.errors}\n`;
-                        response += `- **Critical Issues:** ${analysis.criticalIssues.length}\n\n`;
+USER QUESTION: "${query}"
 
-                        if (analysis.criticalIssues.length > 0) {
-                            response += "**Critical Issues:**\n";
-                            analysis.criticalIssues.slice(0, 3).forEach((issue, i) => {
-                                response += `${i + 1}. Line ${issue.line}: ${issue.content.substring(0, 100)}...\n`;
-                            });
-                            response += "\n";
-                        }
-                    }
-                });
+UPLOADED LOG FILES:
+${logSummary}
 
-                if (totalErrors === 0) {
-                    response += "✅ **Great news!** No errors detected in your DVT logs.\n\n";
-                } else {
-                    response += `**Total Errors:** ${totalErrors} (${criticalCount} critical)\n\n`;
-                }
+Please analyze these DVT logs and answer the user's specific question. Focus on:
 
-                response += "📚 **Obol Resources:**\n";
-                response += "- [Troubleshooting Guide](https://docs.obol.org/docs/advanced/troubleshooting)\n";
-                response += "- [Common Issues](https://docs.obol.org/docs/advanced/troubleshooting)\n";
+1. **DVT CONSENSUS & CHARON**: Look for QBFT consensus, leader selection, Charon middleware issues
+2. **CLUSTER HEALTH**: Assess validator coordination, split key issues, node participation
+3. **MEV-BOOST**: Analyze relay performance, timeouts, optimization opportunities  
+4. **NETWORKING**: Examine P2P connectivity between cluster members
+5. **PERFORMANCE**: Identify bottlenecks, timing issues, optimization areas
 
-                return response;
-            };
+IMPORTANT GUIDELINES:
+- Answer the user's specific question directly
+- Include relevant Obol documentation links from docs.obol.org
+- Use markdown formatting for readability
+- Provide actionable insights and recommendations
+- If you find critical issues, highlight them clearly
+- Keep response focused and practical
 
-            const analyzeConsensus = (query) => {
-                let response = "## 🤝 DVT Consensus Analysis\n\n";
-                let totalConsensusEvents = 0;
+OBOL DOCUMENTATION REFERENCES:
+- Main docs: https://docs.obol.org/
+- Troubleshooting: https://docs.obol.org/docs/advanced/troubleshooting  
+- Charon config: https://docs.obol.org/docs/charon/intro
+- Monitoring: https://docs.obol.org/docs/advanced/monitoring
+- Quick start: https://docs.obol.org/docs/start/quickstart_group
 
-                Object.entries(logData).forEach(([filename, data]) => {
-                    const events = data.analysis.consensusEvents;
-                    totalConsensusEvents += events.length;
+Please provide your analysis with specific Obol context and actionable recommendations.`;
 
-                    if (events.length > 0) {
-                        response += `### 📁 ${filename}\n`;
-                        response += `- **Consensus Events:** ${events.length}\n`;
-                        
-                        const recentEvents = events.slice(-5);
-                        response += "\n**Recent Events:**\n";
-                        recentEvents.forEach((event, i) => {
-                            response += `${i + 1}. Line ${event.line}: ${event.content.substring(0, 80)}...\n`;
-                        });
-                        response += "\n";
-                    }
-                });
-
-                if (totalConsensusEvents === 0) {
-                    response += "⚠️ **No consensus events detected.** This might indicate:\n";
-                    response += "- DVT cluster not properly formed\n";
-                    response += "- Charon middleware not running\n";
-                    response += "- Configuration issues\n\n";
-                    response += "📖 **Setup Guide:** [Create DVT Cluster](https://docs.obol.org/docs/int/quickstart/create-cluster)\n";
-                } else {
-                    response += `✅ **Consensus Active:** ${totalConsensusEvents} events detected\n\n`;
-                    response += "📚 **Learn More:** [DVT Consensus](https://docs.obol.org/docs/learn/intro)\n";
-                }
-
-                return response;
-            };
-
-            const analyzeCharon = (query) => {
-                let response = "## 🔗 Charon Middleware Analysis\n\n";
-                let charonEvents = 0;
-
-                Object.entries(logData).forEach(([filename, data]) => {
-                    const events = data.analysis.charonEvents;
-                    charonEvents += events.length;
-
-                    if (events.length > 0) {
-                        response += `### 📁 ${filename}\n`;
-                        response += `- **Charon Events:** ${events.length}\n`;
-                        
-                        // Look for specific Charon patterns
-                        const errors = events.filter(e => e.content.toLowerCase().includes('error'));
-                        const warnings = events.filter(e => e.content.toLowerCase().includes('warn'));
-                        
-                        if (errors.length > 0) {
-                            response += `- **Charon Errors:** ${errors.length}\n`;
-                        }
-                        if (warnings.length > 0) {
-                            response += `- **Charon Warnings:** ${warnings.length}\n`;
-                        }
-                        response += "\n";
-                    }
-                });
-
-                response += "📚 **Charon Resources:**\n";
-                response += "- [Charon Documentation](https://docs.obol.org/docs/charon/intro)\n";
-                response += "- [Docker Configuration](https://docs.obol.org/docs/charon/run/docker)\n";
-                response += "- [Troubleshooting Charon](https://docs.obol.org/docs/advanced/troubleshooting)\n";
-
-                return response;
-            };
-
-            const analyzeMEV = (query) => {
-                let response = "## 📡 MEV-Boost Analysis\n\n";
-                let mevEvents = 0;
-
-                Object.entries(logData).forEach(([filename, data]) => {
-                    const events = data.analysis.mevEvents;
-                    mevEvents += events.length;
-
-                    if (events.length > 0) {
-                        response += `### 📁 ${filename}\n`;
-                        response += `- **MEV Events:** ${events.length}\n`;
-                        
-                        const recentEvents = events.slice(-3);
-                        response += "\n**Recent MEV Activity:**\n";
-                        recentEvents.forEach((event, i) => {
-                            response += `${i + 1}. Line ${event.line}: ${event.content.substring(0, 80)}...\n`;
-                        });
-                        response += "\n";
-                    }
-                });
-
-                response += "📚 **MEV Resources:**\n";
-                response += "- [MEV-Boost with DVT](https://docs.obol.org/docs/advanced/mev-boost)\n";
-                response += "- [Relay Configuration](https://docs.obol.org/docs/advanced/mev-boost)\n";
-
-                return response;
-            };
-
-            const generateSummary = (query) => {
-                let response = "## 📊 DVT Cluster Summary\n\n";
-                
-                const stats = {
-                    totalFiles: Object.keys(logData).length,
-                    totalLines: 0,
-                    totalErrors: 0,
-                    totalWarnings: 0,
-                    consensusEvents: 0,
-                    charonEvents: 0,
-                    mevEvents: 0
-                };
-
-                Object.values(logData).forEach(data => {
-                    const analysis = data.analysis;
-                    stats.totalLines += analysis.totalLines;
-                    stats.totalErrors += analysis.errors;
-                    stats.totalWarnings += analysis.warnings;
-                    stats.consensusEvents += analysis.consensusEvents.length;
-                    stats.charonEvents += analysis.charonEvents.length;
-                    stats.mevEvents += analysis.mevEvents.length;
-                });
-
-                // Health Score Calculation
-                const healthScore = Math.max(0, 100 - (stats.totalErrors * 5) - (stats.totalWarnings * 1));
-                
-                response += `### 🏥 DVT Health Score: **${healthScore}/100**\n`;
-                if (healthScore >= 90) response += "✅ **Excellent** - Cluster running smoothly\n";
-                else if (healthScore >= 70) response += "🟡 **Good** - Minor issues detected\n";
-                else if (healthScore >= 50) response += "🟠 **Warning** - Several issues need attention\n";
-                else response += "🔴 **Critical** - Immediate action required\n\n";
-
-                response += "### 📈 Statistics:\n";
-                response += `- **Files Analyzed:** ${stats.totalFiles}\n`;
-                response += `- **Total Log Lines:** ${stats.totalLines.toLocaleString()}\n`;
-                response += `- **Errors:** ${stats.totalErrors}\n`;
-                response += `- **Warnings:** ${stats.totalWarnings}\n`;
-                response += `- **Consensus Events:** ${stats.consensusEvents}\n`;
-                response += `- **Charon Activity:** ${stats.charonEvents}\n`;
-                response += `- **MEV Events:** ${stats.mevEvents}\n\n`;
-
-                response += "### 🎯 Recommendations:\n";
-                if (stats.totalErrors > 10) {
-                    response += "- 🚨 High error count detected - investigate critical issues\n";
-                }
-                if (stats.consensusEvents === 0) {
-                    response += "- ⚠️ No consensus activity - check DVT cluster configuration\n";
-                }
-                if (stats.charonEvents === 0) {
-                    response += "- 🔗 No Charon activity detected - verify middleware is running\n";
-                }
-
-                response += "\n📚 **Quick Links:**\n";
-                response += "- [Monitoring Guide](https://docs.obol.org/docs/advanced/monitoring)\n";
-                response += "- [Health Checks](https://docs.obol.org/docs/advanced/monitoring)\n";
-
-                return response;
-            };
-
-            const generateHealthReport = (query) => {
-                return generateSummary(query);
-            };
-
-            const analyzeTimeline = (query) => {
-                let response = "## ⏱️ Timeline Analysis\n\n";
-                
-                const allTimestamps = [];
-                Object.entries(logData).forEach(([filename, data]) => {
-                    data.analysis.timestamps.forEach(ts => {
-                        allTimestamps.push({
-                            filename,
-                            ...ts
-                        });
-                    });
-                });
-
-                if (allTimestamps.length === 0) {
-                    response += "❌ No timestamps found in the log files.\n";
+                    // Call Claude AI API
+                    const response = await analyzeWithClaude(prompt);
                     return response;
+                    
+                } catch (error) {
+                    console.error('Analysis error:', error);
+                    return `❌ **Analysis Error**
+                    
+Sorry, I encountered an error analyzing your logs: ${error.message}
+
+**Possible causes:**
+- API connection issue
+- Invalid log format  
+- Service temporarily unavailable
+
+**Try:**
+- Check your internet connection
+- Re-upload your log files
+- Ask a different question
+
+If the problem persists, the Claude AI service might be temporarily unavailable.`;
                 }
-
-                allTimestamps.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-                
-                const earliest = allTimestamps[0];
-                const latest = allTimestamps[allTimestamps.length - 1];
-                
-                response += `### 📅 Time Range:\n`;
-                response += `- **Start:** ${earliest.timestamp} (${earliest.filename})\n`;
-                response += `- **End:** ${latest.timestamp} (${latest.filename})\n`;
-                response += `- **Total Events:** ${allTimestamps.length}\n\n`;
-
-                // Show recent activity
-                response += "### 🕐 Recent Activity (Last 10 events):\n";
-                allTimestamps.slice(-10).forEach((event, i) => {
-                    response += `${i + 1}. ${event.timestamp} - ${event.filename} (Line ${event.line})\n`;
-                });
-
-                return response;
             };
 
-            const analyzePerformance = (query) => {
-                let response = "## ⚡ Performance Analysis\n\n";
-                
-                response += "Based on log analysis, here are potential performance insights:\n\n";
-                
-                Object.entries(logData).forEach(([filename, data]) => {
-                    const analysis = data.analysis;
-                    response += `### 📁 ${filename}\n`;
+            const analyzeWithClaude = async (prompt) => {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ prompt })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorMessage;
                     
-                    // Calculate events per line ratio
-                    const eventDensity = (analysis.consensusEvents.length + analysis.charonEvents.length) / analysis.totalLines;
-                    
-                    if (eventDensity > 0.1) {
-                        response += "🔥 **High Activity** - Frequent consensus/Charon events\n";
-                    } else if (eventDensity > 0.01) {
-                        response += "⚡ **Moderate Activity** - Normal consensus patterns\n";
-                    } else {
-                        response += "📈 **Low Activity** - Limited consensus events\n";
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.error || errorData.message || 'Unknown error';
+                    } catch {
+                        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
                     }
                     
-                    response += `- Event Density: ${(eventDensity * 100).toFixed(2)}%\n`;
-                    response += `- Error Rate: ${((analysis.errors / analysis.totalLines) * 100).toFixed(3)}%\n\n`;
-                });
-
-                response += "📚 **Performance Resources:**\n";
-                response += "- [Performance Tuning](https://docs.obol.org/docs/advanced/performance-tuning)\n";
-                response += "- [Monitoring](https://docs.obol.org/docs/advanced/monitoring)\n";
-
-                return response;
-            };
-
-            const searchLogs = (query) => {
-                const searchTerm = query.replace(/search|find|look for/gi, '').trim();
-                if (!searchTerm) {
-                    return "Please specify what you'd like to search for. Example: 'search for timeout errors'";
+                    throw new Error(errorMessage);
                 }
 
-                let response = `## 🔍 Search Results for: "${searchTerm}"\n\n`;
-                let totalMatches = 0;
-
-                Object.entries(logData).forEach(([filename, data]) => {
-                    const matches = [];
-                    data.lines.forEach((line, index) => {
-                        if (line.toLowerCase().includes(searchTerm.toLowerCase())) {
-                            matches.push({ line: index + 1, content: line.trim() });
-                        }
-                    });
-
-                    if (matches.length > 0) {
-                        totalMatches += matches.length;
-                        response += `### 📁 ${filename} (${matches.length} matches)\n`;
-                        matches.slice(0, 5).forEach((match, i) => {
-                            response += `${i + 1}. Line ${match.line}: ${match.content.substring(0, 100)}...\n`;
-                        });
-                        if (matches.length > 5) {
-                            response += `... and ${matches.length - 5} more matches\n`;
-                        }
-                        response += "\n";
-                    }
-                });
-
-                if (totalMatches === 0) {
-                    response += `❌ No matches found for "${searchTerm}"\n`;
-                    response += "\n**Try searching for:**\n";
-                    response += "- error, warning, timeout\n";
-                    response += "- consensus, qbft, leader\n";
-                    response += "- charon, relay, mev\n";
-                } else {
-                    response += `✅ **Total matches:** ${totalMatches}\n`;
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Analysis failed');
                 }
 
-                return response;
-            };
-
-            const handleGeneralQuery = (query) => {
-                const suggestions = [
-                    "Show me all errors",
-                    "Analyze consensus activity", 
-                    "Check Charon status",
-                    "Generate summary report",
-                    "Search for timeout issues",
-                    "What's my cluster health?",
-                    "Show timeline of events"
-                ];
-
-                return `I understand you're asking: "${query}"
-
-While I can provide general DVT guidance, I work best with specific commands. Here are some things you can try:
-
-**🔍 Popular Commands:**
-${suggestions.map(s => `• "${s}"`).join('\n')}
-
-**📚 Or ask about:**
-• Specific error messages or patterns
-• DVT consensus behavior  
-• Charon middleware issues
-• MEV-Boost integration
-• Performance concerns
-• Configuration problems
-
-**📖 Obol Documentation:** [docs.obol.org](https://docs.obol.org)
-
-What would you like to explore first?`;
+                return data.analysis;
             };
 
             const handleSendMessage = async () => {
@@ -653,13 +392,13 @@ What would you like to explore first?`;
             };
 
             return (
-                <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800">
+                <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-green-900">
                     <div className="container mx-auto px-4 py-6">
                         {/* Header */}
                         <div className="text-center mb-8">
                             <h1 className="text-3xl font-bold text-white mb-2">Enhanced DVT Log Analyzer</h1>
                             <p className="text-gray-300 mb-4">Interactive AI Assistant with Obol Network Integration</p>
-                            <div className="inline-block bg-orange-500/20 text-orange-300 px-4 py-2 rounded-full text-sm">
+                            <div className="inline-block bg-green-500/20 text-green-300 px-4 py-2 rounded-full text-sm">
                                 🤖 AI-Powered • 📚 Obol Docs • 🔍 Interactive Analysis
                             </div>
                         </div>
@@ -672,7 +411,7 @@ What would you like to explore first?`;
                                     <h2 className="text-lg font-bold text-white mb-4">📁 Upload DVT Logs</h2>
                                     
                                     <div 
-                                        className="border-2 border-dashed border-orange-400/50 rounded-lg p-6 text-center hover:border-orange-400 transition-colors cursor-pointer bg-orange-500/5"
+                                        className="border-2 border-dashed border-green-400/50 rounded-lg p-6 text-center hover:border-green-400 transition-colors cursor-pointer bg-green-500/5"
                                         onClick={() => fileInputRef.current?.click()}
                                     >
                                         <div className="text-3xl mb-2">📄</div>
@@ -730,7 +469,7 @@ What would you like to explore first?`;
                                             <button
                                                 key={i}
                                                 onClick={() => quickCommand(cmd)}
-                                                className="w-full text-left bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-200 px-3 py-2 rounded-lg text-sm transition-colors"
+                                                className="w-full text-left bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-200 px-3 py-2 rounded-lg text-sm transition-colors"
                                                 disabled={files.length === 0}
                                             >
                                                 {cmd}
@@ -752,7 +491,7 @@ What would you like to explore first?`;
                                                     <p className="text-white text-sm font-medium truncate">{filename}</p>
                                                     <div className="grid grid-cols-3 gap-2 mt-1">
                                                         <div className="text-center">
-                                                            <div className="text-orange-400 text-xs">{data.analysis.totalLines.toLocaleString()}</div>
+                                                            <div className="text-green-400 text-xs">{data.analysis.totalLines.toLocaleString()}</div>
                                                             <div className="text-gray-400 text-xs">Lines</div>
                                                         </div>
                                                         <div className="text-center">
@@ -782,8 +521,8 @@ What would you like to explore first?`;
                                                 <p className="text-gray-400 text-sm">Ask me anything about your DVT logs</p>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
-                                                <span className="text-orange-400 text-sm">Online</span>
+                                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                                <span className="text-green-400 text-sm">Online</span>
                                             </div>
                                         </div>
                                     </div>
@@ -811,10 +550,10 @@ What would you like to explore first?`;
                                                         <div dangerouslySetInnerHTML={{
                                                             __html: message.content
                                                                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                                                .replace(/^##\s(.+)$/gm, '<h3 style="color: #ff6b4a; margin: 16px 0 8px 0;">$1</h3>')
-                                                                .replace(/^###\s(.+)$/gm, '<h4 style="color: #ff8566; margin: 12px 0 6px 0;">$1</h4>')
+                                                                .replace(/^##\s(.+)$/gm, '<h3 style="color: #00ff88; margin: 16px 0 8px 0;">$1</h3>')
+                                                                .replace(/^###\s(.+)$/gm, '<h4 style="color: #4ade80; margin: 12px 0 6px 0;">$1</h4>')
                                                                 .replace(/^-\s(.+)$/gm, '<li style="margin: 4px 0;">$1</li>')
-                                                                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: #ff6b4a; text-decoration: underline;">$1</a>')
+                                                                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: #00ff88; text-decoration: underline;">$1</a>')
                                                                 .replace(/\n/g, '<br>')
                                                         }} />
                                                     </div>
@@ -854,7 +593,7 @@ What would you like to explore first?`;
                                                         : "Upload log files first, then ask me questions..."
                                                     }
                                                     disabled={isTyping}
-                                                    className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-orange-400 focus:bg-white/10 transition-all"
+                                                    className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-green-400 focus:bg-white/10 transition-all"
                                                     style={{ minHeight: '44px', maxHeight: '120px' }}
                                                 />
                                                 <div className="absolute right-2 bottom-2 text-xs text-gray-500">
@@ -864,7 +603,7 @@ What would you like to explore first?`;
                                             <button
                                                 onClick={handleSendMessage}
                                                 disabled={!inputMessage.trim() || isTyping}
-                                                className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center gap-2"
+                                                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center gap-2"
                                             >
                                                 {isTyping ? (
                                                     <>
