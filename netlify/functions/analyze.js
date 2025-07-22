@@ -1,109 +1,211 @@
-// Enhanced AI Analysis Function with Obol Documentation
-// Replace the analyzeWithClaude function in your index.html with this version:
+// Enhanced Claude AI API endpoint for DVT log analysis
+exports.handler = async (event, context) => {
+    // Set CORS headers for all responses
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Content-Type': 'application/json'
+    };
 
-const analyzeWithClaude = async (filesWithContent) => {
-    console.log('Starting AI analysis with Obol documentation integration...');
-    
-    // Enhanced prompt with Obol context
-    const prompt = `You are an expert Obol Network DVT (Distributed Validator Technology) log analyzer. Analyze these log files and provide insights with specific Obol documentation references.
-
-## LOG FILES CONTEXT:
-${filesWithContent.map(f => `- **${f.name}** (${f.type}): ${f.content.split('\n').length} lines`).join('\n')}
-
-## ANALYSIS REQUIREMENTS:
-
-### 1. DVT CONSENSUS & CHARON ANALYSIS
-- Identify DVT consensus events and Charon middleware issues
-- Look for QBFT consensus rounds, leader selection, and distributed validator coordination
-- Reference: https://docs.obol.org/docs/learn/intro
-
-### 2. OBOL CLUSTER HEALTH
-- Assess overall cluster health and node participation
-- Identify split validator key issues or cluster formation problems
-- Reference: https://docs.obol.org/docs/int/quickstart/create-cluster
-
-### 3. MEV-BOOST INTEGRATION
-- Analyze MEV-Boost relay performance in DVT context
-- Identify relay timeouts, failures, and optimization opportunities
-- Reference: https://docs.obol.org/docs/advanced/mev-boost
-
-### 4. NETWORKING & P2P ISSUES
-- Examine Charon P2P networking and node discovery
-- Identify connectivity issues between DVT cluster members
-- Reference: https://docs.obol.org/docs/advanced/networking
-
-### 5. PERFORMANCE OPTIMIZATION
-- Assess DVT-specific performance metrics and bottlenecks
-- Focus on consensus timing, attestation coordination, and block proposal efficiency
-- Reference: https://docs.obol.org/docs/advanced/performance-tuning
-
-## OBOL DOCUMENTATION INTEGRATION:
-For each issue identified, provide specific Obol documentation links from:
-- Main docs: https://docs.obol.org/
-- Troubleshooting: https://docs.obol.org/docs/advanced/troubleshooting
-- Charon config: https://docs.obol.org/docs/charon/run/docker
-- Monitoring: https://docs.obol.org/docs/advanced/monitoring
-
-## OUTPUT FORMAT:
-Structure your response as:
-1. **DVT Cluster Health Score** (0-100)
-2. **Critical Issues** (with Obol doc links)
-3. **Consensus Analysis** (QBFT/leader detection)
-4. **Charon Middleware Status**
-5. **Actionable Recommendations** (with specific Obol documentation references)
-
-Keep analysis concise but actionable. Always include relevant Obol documentation links.
-
-## LOG SAMPLES:
-${filesWithContent.map(f => `### ${f.name} (${f.type.toUpperCase()})\n${f.content.slice(0, 3000)}`).join('\n\n')}
-
-Provide your analysis with specific Obol Network context and documentation references.`;
-
-    const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt })
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Request failed');
+    // Handle preflight OPTIONS request
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers,
+            body: ''
+        };
     }
 
-    const data = await response.json();
-    
-    if (data.success) {
-        // Enhance AI response with additional Obol documentation
-        const enhancedAnalysis = data.analysis + `
+    // Only allow POST method
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({
+                success: false,
+                error: 'Method not allowed. Use POST.'
+            })
+        };
+    }
 
-## 📚 Additional Obol Resources
+    try {
+        // Parse request body
+        if (!event.body) {
+            return {
+                statusCode: 400,
+                headers,
+                body: JSON.stringify({
+                    success: false,
+                    error: 'Request body is required'
+                })
+            };
+        }
 
-### Quick References:
-- **🚀 Getting Started**: [Obol Quickstart](https://docs.obol.org/docs/start/quickstart_group)
-- **🔧 Troubleshooting**: [Common Issues](https://docs.obol.org/docs/advanced/troubleshooting)
-- **📊 Monitoring**: [Health Checks](https://docs.obol.org/docs/advanced/monitoring)
-- **🌐 Networking**: [P2P Configuration](https://docs.obol.org/docs/advanced/networking)
-- **⚡ Performance**: [Optimization Guide](https://docs.obol.org/docs/advanced/performance-tuning)
+        const { prompt } = JSON.parse(event.body);
 
-### DVT-Specific Resources:
-- **🔑 Key Management**: [Distributed Keys](https://docs.obol.org/docs/advanced/key-management)
-- **🤝 Consensus**: [QBFT & Leadership](https://docs.obol.org/docs/learn/intro)
-- **🔗 Charon**: [Middleware Documentation](https://docs.obol.org/docs/charon/intro)
-- **💎 MEV-Boost**: [DVT Integration](https://docs.obol.org/docs/advanced/mev-boost)
-- **📦 Backup & Recovery**: [Key Safety](https://docs.obol.org/docs/advanced/backup-recovery)
+        if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+            return {
+                statusCode: 400,
+                headers,
+                body: JSON.stringify({
+                    success: false,
+                    error: 'Valid prompt is required in request body'
+                })
+            };
+        }
 
-### Community & Support:
-- **📖 Full Documentation**: [docs.obol.org](https://docs.obol.org)
-- **💬 Discord Community**: Get help from other DVT operators
-- **🐛 Report Issues**: Contribute to Obol Network development
+        // Check for API key
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+            console.error('ANTHROPIC_API_KEY environment variable not set');
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({
+                    success: false,
+                    error: 'API configuration error. Please contact administrator.'
+                })
+            };
+        }
+
+        console.log('Calling Claude API for DVT log analysis...');
+        console.log('Prompt length:', prompt.length);
+
+        // Call Claude AI API
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+                model: 'claude-3-sonnet-20240229',
+                max_tokens: 4000,
+                temperature: 0.3, // Lower temperature for more focused technical analysis
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                system: `You are an expert Obol Network DVT (Distributed Validator Technology) analyst with deep knowledge of:
+
+- Obol Network ecosystem and Charon middleware
+- DVT consensus mechanisms (QBFT) and cluster coordination
+- Ethereum validator operations and MEV-Boost integration
+- Distributed validator troubleshooting and optimization
+- P2P networking and validator key management
+
+Provide clear, actionable analysis with:
+- Specific technical insights relevant to DVT operations
+- Relevant Obol documentation links (docs.obol.org)
+- Markdown formatting for excellent readability
+- Focus on consensus health, Charon status, MEV-Boost performance, cluster coordination
+- Practical troubleshooting steps when issues are identified
+- Professional tone appropriate for DevOps and validator operators
+
+Always include contextual Obol Network documentation links and keep responses focused on DVT-specific concerns.`
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Claude API error:', response.status, response.statusText, errorText);
+            
+            let errorMessage = 'Claude AI service error';
+            try {
+                const errorData = JSON.parse(errorText);
+                errorMessage = errorData.error?.message || errorData.message || errorMessage;
+            } catch (e) {
+                // Use default error message
+                errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            }
+
+            return {
+                statusCode: response.status,
+                headers,
+                body: JSON.stringify({
+                    success: false,
+                    error: `Claude API error: ${errorMessage}`
+                })
+            };
+        }
+
+        const aiResponse = await response.json();
+        
+        // Extract the content from Claude's response
+        if (!aiResponse.content || !aiResponse.content[0] || !aiResponse.content[0].text) {
+            console.error('Unexpected Claude API response format:', JSON.stringify(aiResponse));
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({
+                    success: false,
+                    error: 'Invalid response format from Claude AI'
+                })
+            };
+        }
+
+        const analysis = aiResponse.content[0].text;
+
+        // Enhanced analysis with Obol footer
+        const enhancedAnalysis = analysis + `
 
 ---
-*Analysis enhanced with Obol Network documentation integration*`;
 
-        return enhancedAnalysis;
-    } else {
-        throw new Error(data.error || 'Analysis failed');
+## 📚 Additional Obol Network Resources
+
+### 🚀 Essential Documentation:
+- **[Quick Start Guide](https://docs.obol.org/docs/start/quickstart_group)** - Get your DVT cluster running
+- **[Troubleshooting](https://docs.obol.org/docs/advanced/troubleshooting)** - Common issues and solutions
+- **[Monitoring & Health Checks](https://docs.obol.org/docs/advanced/monitoring)** - Keep your cluster healthy
+- **[Performance Tuning](https://docs.obol.org/docs/advanced/performance-tuning)** - Optimize your setup
+
+### 🔧 Technical Resources:
+- **[Charon Configuration](https://docs.obol.org/docs/charon/intro)** - Middleware setup and config
+- **[Networking & P2P](https://docs.obol.org/docs/advanced/networking)** - P2P connectivity guide
+- **[MEV-Boost Integration](https://docs.obol.org/docs/advanced/mev-boost)** - DVT with MEV-Boost
+- **[Key Management](https://docs.obol.org/docs/advanced/key-management)** - Distributed key security
+
+### 🤝 Community & Support:
+- **[Full Documentation](https://docs.obol.org)** - Complete Obol Network docs
+- **[Discord Community](https://discord.gg/obol)** - Get help from operators and developers
+- **[GitHub Repository](https://github.com/ObolNetwork)** - Open source development
+
+*🤖 Analysis powered by Claude AI with specialized Obol Network expertise*
+*🔗 Enhanced DVT Log Analyzer - Built for the Obol Collective*`;
+
+        console.log('Claude AI analysis completed successfully');
+        console.log('Response length:', enhancedAnalysis.length);
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+                success: true,
+                analysis: enhancedAnalysis,
+                timestamp: new Date().toISOString(),
+                model: 'claude-3-sonnet-20240229',
+                usage: {
+                    prompt_tokens: prompt.length / 4, // Rough estimate
+                    completion_tokens: analysis.length / 4 // Rough estimate
+                }
+            })
+        };
+
+    } catch (error) {
+        console.error('Function execution error:', error);
+        
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({
+                success: false,
+                error: error.message || 'Internal server error',
+                timestamp: new Date().toISOString()
+            })
+        };
     }
 };
